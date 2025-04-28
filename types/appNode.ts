@@ -29,7 +29,7 @@ export interface ColumnConstraint {
 export interface Column {
   id: string;
   logicalName: string; // 한글 이름
-  physicalName: string; // 실제 컬럼명
+  physicalName: string; // 실제 컬럼;
   dataType: ColumnDataType;
   typeOptions?: {
     length?: number; // varchar(255)와 같은 길이
@@ -53,6 +53,7 @@ export interface AppNodeData {
   id: string;
   logicalName: string; // 한글 테이블명
   physicalName: string; // 실제 테이블명
+  color: string;
   columns: Column[];
   indices?: TableIndex[];
   description?: string; // 테이블 설명

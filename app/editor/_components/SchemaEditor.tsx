@@ -13,6 +13,7 @@ import {
 import React, { useEffect } from "react";
 import DeleteableEdge from "./edges/DeletableEdge";
 import NodeComponent from "./nodes/NodeComponent";
+import "@xyflow/react/dist/style.css";
 
 const nodeTypes = {
   SchemaNode: NodeComponent,

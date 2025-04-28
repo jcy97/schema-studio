@@ -12,6 +12,7 @@ export const initialNodes: AppNode[] = [
       id: "table-1",
       logicalName: "사용자",
       physicalName: "USER_TB",
+      color: "",
       columns: [
         {
           id: "col-1",
