@@ -10,7 +10,7 @@ import {
   useEdgesState,
   useNodesState,
 } from "@xyflow/react";
-import React, { useEffect } from "react";
+import React, { DragEventHandler, useEffect } from "react";
 import DeleteableEdge from "./edges/DeletableEdge";
 import NodeComponent from "./nodes/NodeComponent";
 import "@xyflow/react/dist/style.css";
@@ -30,6 +30,10 @@ function SchemaEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
+  const onNodeDragOver = (event: React.MouseEvent, node: AppNode) => {
+    console.log(12345678);
+  };
+
   return (
     <main className="w-full h-full">
       <ReactFlow
@@ -38,6 +42,7 @@ function SchemaEditor() {
         //자동 저장 구현을 원할경우 아래 체인지 함수에 뮤테이션 걸어주면 된다.
         onEdgesChange={onEdgesChange}
         onNodesChange={onNodesChange}
+        onNodeDragStart={onNodeDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         snapToGrid

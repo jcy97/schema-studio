@@ -31,6 +31,7 @@ export interface Column {
   logicalName: string; // 한글 이름
   physicalName: string; // 실제 컬럼;
   dataType: ColumnDataType;
+  order: number; // 정렬순서
   typeOptions?: {
     length?: number; // varchar(255)와 같은 길이
     precision?: number; // decimal(10,2)의 10

@@ -19,6 +19,7 @@ export const initialNodes: AppNode[] = [
           logicalName: "사용자 아이디",
           physicalName: "user_id",
           dataType: "int",
+          order: 0,
           constraints: {
             isPrimaryKey: true,
             isNotNull: true,
@@ -30,6 +31,7 @@ export const initialNodes: AppNode[] = [
           logicalName: "이름",
           physicalName: "name",
           dataType: "varchar",
+          order: 1,
           typeOptions: {
             length: 100,
           },
@@ -42,6 +44,7 @@ export const initialNodes: AppNode[] = [
           logicalName: "이메일",
           physicalName: "email",
           dataType: "varchar",
+          order: 2,
           typeOptions: {
             length: 255,
           },
@@ -55,6 +58,7 @@ export const initialNodes: AppNode[] = [
           logicalName: "생성일시",
           physicalName: "created_at",
           dataType: "datetime",
+          order: 3,
           constraints: {
             isNotNull: true,
             defaultValue: "CURRENT_TIMESTAMP",
