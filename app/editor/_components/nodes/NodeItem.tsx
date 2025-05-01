@@ -17,10 +17,14 @@ function NodeItem({
   item,
   index,
   onGripMouseDown,
+  isSelected,
+  onItemClick,
 }: {
   item: Column;
   index: number;
   onGripMouseDown: (e: React.MouseEvent, index: number) => void;
+  isSelected: boolean;
+  onItemClick: (index: number) => void;
 }) {
   // 컬럼 유형에 따른 아이콘 렌더링 함수
   const renderColumnIcon = (): JSX.Element => {
@@ -54,8 +58,11 @@ function NodeItem({
 
   return (
     <div
-      className="flex items-center p-2 border-b border-gray-100 hover:bg-gray-50"
+      className={`flex items-center p-2 border-b border-gray-100  cursor-pointer ${
+        isSelected ? "bg-blue-50" : "hover:bg-gray-50"
+      }`}
       data-index={index}
+      onClick={() => onItemClick(index)}
     >
       {renderColumnIcon()}
       <p className="font-medium">{item.logicalName}</p>

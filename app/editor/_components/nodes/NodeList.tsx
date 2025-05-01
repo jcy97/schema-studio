@@ -14,11 +14,28 @@ function NodeList({
     [...columns].sort((a, b) => a.order - b.order)
   );
 
+  // 현재 선택된 아이템의 인덱스 상태 추가
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
   const [isDragging, setIsDragging] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const listRef = useRef<HTMLDivElement>(null);
+
+  // 아이템 클릭 이벤트 처리 함수
+  const handleItemClick = useCallback(
+    (index: number) => {
+      // 같은 아이템을 다시 클릭하면 선택 해제
+      if (selectedIndex === index) {
+        setSelectedIndex(null);
+      } else {
+        // 다른 아이템을 클릭하면 선택 변경
+        setSelectedIndex(index);
+      }
+    },
+    [selectedIndex]
+  );
 
   // 그립 핸들에서 마우스 다운 이벤트 처리
   const handleGripMouseDown = useCallback(
@@ -108,6 +125,26 @@ function NodeList({
 
       setLocalColumns(columnsWithUpdatedOrder);
 
+      // 선택된 아이템의 인덱스 업데이트
+      if (selectedIndex !== null) {
+        if (selectedIndex === draggedIndex) {
+          // 선택된 아이템이 이동된 경우 새 인덱스로 업데이트
+          setSelectedIndex(dragOverIndex);
+        } else if (
+          selectedIndex > draggedIndex &&
+          selectedIndex <= dragOverIndex
+        ) {
+          // 선택된 아이템 앞에서 뒤로 이동한 경우
+          setSelectedIndex(selectedIndex - 1);
+        } else if (
+          selectedIndex < draggedIndex &&
+          selectedIndex >= dragOverIndex
+        ) {
+          // 선택된 아이템 뒤에서 앞으로 이동한 경우
+          setSelectedIndex(selectedIndex + 1);
+        }
+      }
+
       // 상위 컴포넌트에 변경 사항 전달
       if (onColumnsChange) {
         onColumnsChange(columnsWithUpdatedOrder);
@@ -128,7 +165,14 @@ function NodeList({
     setDraggedIndex(null);
     setDragOverIndex(null);
     document.body.style.userSelect = "";
-  }, [isDragging, draggedIndex, dragOverIndex, localColumns, onColumnsChange]);
+  }, [
+    isDragging,
+    draggedIndex,
+    dragOverIndex,
+    localColumns,
+    onColumnsChange,
+    selectedIndex,
+  ]);
 
   // 마우스 이벤트 리스너 설정/제거
   useEffect(() => {
@@ -151,6 +195,8 @@ function NodeList({
           item={column}
           index={index}
           onGripMouseDown={handleGripMouseDown}
+          isSelected={selectedIndex === index}
+          onItemClick={handleItemClick}
         />
       ))}
     </div>
