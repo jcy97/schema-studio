@@ -1,15 +1,36 @@
 import React from "react";
+import PropertyInput from "./PropertyInput";
 
 interface TitleHeaderProps {
   logicalName: string;
   physicalName: string;
+  onLogicalNameChange: (value: string | number) => void;
+  onPhysicalNameChange: (value: string | number) => void;
 }
 
-function TitleHeader({ logicalName, physicalName }: TitleHeaderProps) {
+function TitleHeader({
+  logicalName,
+  physicalName,
+  onLogicalNameChange,
+  onPhysicalNameChange,
+}: TitleHeaderProps) {
   return (
-    <div className="flex flex-col py-1">
-      <p>{logicalName}</p>
-      <p>{physicalName}</p>
+    <div className="flex flex-col">
+      <div className="py-2">
+        <p className="font-bold">스키마 기본 정보</p>
+      </div>
+      <PropertyInput
+        title="논리명"
+        value={logicalName}
+        type="text"
+        onChange={onLogicalNameChange}
+      />
+      <PropertyInput
+        title="물리명"
+        value={physicalName}
+        type="text"
+        onChange={onPhysicalNameChange}
+      />
     </div>
   );
 }

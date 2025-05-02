@@ -9,7 +9,7 @@ import {
   ReactFlow,
   ReactFlowProps,
 } from "@xyflow/react";
-import React from "react";
+import React, { useEffect } from "react";
 import DeleteableEdge from "./edges/DeletableEdge";
 import NodeComponent from "./nodes/NodeComponent";
 import "@xyflow/react/dist/style.css";
@@ -33,6 +33,11 @@ function SchemaEditor() {
   // useEffect(() => {
   //   addNode({ ...initialNodes[0], id: "12312312312" });
   // }, []);
+
+  useEffect(() => {
+    console.log("노드 상태 변경됨:", nodes);
+    // 필요한 경우 여기서 후속 작업 수행
+  }, [nodes]);
 
   //Selection 확인
   const onNodeSelectionChange = (data: ReactFlowProps<AppNode, Edge>) => {

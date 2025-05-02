@@ -26,14 +26,17 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string>("");
 
-  const updateNode = (nodeId: string, data: Partial<AppNode>["data"]) => {
+  const updateNode = (nodeId: string, data: Partial<AppNode["data"]>) => {
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === nodeId) {
-          return {
+          // 새로운 노드 객체를 생성하여 참조를 변경
+          const newNode = {
             ...node,
             data: { ...node.data, ...data },
           };
+          console.log("노드 업데이트:", nodeId, newNode.data);
+          return newNode;
         }
         return node;
       })

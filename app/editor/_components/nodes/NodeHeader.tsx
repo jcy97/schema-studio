@@ -1,7 +1,13 @@
 "use client";
 import { getRandomBgColor } from "@/lib/utils";
 import { Copy, GripVertical, Sheet, Trash2 } from "lucide-react";
-import React, { useState, useRef, ChangeEvent, KeyboardEvent } from "react";
+import React, {
+  useState,
+  useRef,
+  ChangeEvent,
+  KeyboardEvent,
+  useEffect,
+} from "react";
 
 interface NodeHeaderProps {
   logicalName: string;
@@ -15,6 +21,12 @@ function NodeHeader({
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [name, setName] = useState<string>(logicalName);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // logicalName이 변경될 때마다 로컬 name 상태를 업데이트
+  useEffect(() => {
+    console.log("NodeHeader - logicalName 변경됨:", logicalName);
+    setName(logicalName);
+  }, [logicalName]); // logicalName이 변경될 때만 실행
 
   const bgColorClass = React.useMemo(() => {
     return color || getRandomBgColor();
