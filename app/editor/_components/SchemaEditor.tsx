@@ -7,10 +7,9 @@ import {
   Controls,
   Edge,
   ReactFlow,
-  useEdgesState,
-  useNodesState,
+  ReactFlowProps,
 } from "@xyflow/react";
-import React, { DragEventHandler, useEffect } from "react";
+import React from "react";
 import DeleteableEdge from "./edges/DeletableEdge";
 import NodeComponent from "./nodes/NodeComponent";
 import "@xyflow/react/dist/style.css";
@@ -28,11 +27,20 @@ const snapGrid: [number, number] = [50, 50];
 const fitViewOptions = { padding: 1 };
 
 function SchemaEditor() {
-  const { nodes, edges, onNodesChange, onEdgesChange } = useSchema();
+  const { nodes, edges, onNodesChange, onEdgesChange, onNodeSelect } =
+    useSchema();
   //복사 샘플
   // useEffect(() => {
   //   addNode({ ...initialNodes[0], id: "12312312312" });
   // }, []);
+
+  //Selection 확인
+  const onNodeSelectionChange = (data: ReactFlowProps<AppNode, Edge>) => {
+    if (!data.nodes) return;
+    const selectedNode = data.nodes.find((node) => node.selected === true);
+    if (!selectedNode) return;
+    onNodeSelect(selectedNode.id);
+  };
 
   return (
     <main className="w-full h-full">
@@ -42,6 +50,7 @@ function SchemaEditor() {
         //자동 저장 구현을 원할경우 아래 체인지 함수에 뮤테이션 걸어주면 된다.
         onEdgesChange={onEdgesChange}
         onNodesChange={onNodesChange}
+        onSelectionChange={onNodeSelectionChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         snapToGrid

@@ -2,7 +2,7 @@
 import { initialNodes } from "@/sample";
 import { AppNode } from "@/types/appNode";
 import { Connection, Edge, useEdgesState, useNodesState } from "@xyflow/react";
-import { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 
 interface SchemaContextType {
   nodes: AppNode[];
@@ -15,6 +15,8 @@ interface SchemaContextType {
   removeEdge: (edgeId: string) => void;
   onNodesChange: () => void;
   onEdgesChange: () => void;
+  onNodeSelect: (nodeId: string) => void;
+  getSelectedNode: () => AppNode;
 }
 
 const SchemaContext = createContext<SchemaContextType | undefined>(undefined);
@@ -22,6 +24,7 @@ const SchemaContext = createContext<SchemaContextType | undefined>(undefined);
 export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string>("");
 
   const updateNode = (nodeId: string, data: Partial<AppNode>["data"]) => {
     setNodes((nds) =>
@@ -64,6 +67,15 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
   };
 
+  const onNodeSelect = (nodeId: string) => {
+    setSelectedNodeId(nodeId);
+  };
+
+  const getSelectedNode = useCallback(() => {
+    const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+    return selectedNode;
+  }, [nodes, selectedNodeId]);
+
   const value: SchemaContextType = {
     nodes,
     edges,
@@ -75,6 +87,8 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     removeEdge,
     onNodesChange,
     onEdgesChange,
+    onNodeSelect,
+    getSelectedNode,
   } as SchemaContextType;
   return (
     <SchemaContext.Provider value={value}>{children}</SchemaContext.Provider>
