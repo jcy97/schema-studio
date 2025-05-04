@@ -1,6 +1,7 @@
 import { Column } from "@/types/appNode";
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import NodeItem from "./NodeItem";
+import { useSchema } from "@/contexts/SchemaContext";
 
 function NodeList({
   columns,
@@ -14,8 +15,17 @@ function NodeList({
     [...columns].sort((a, b) => a.order - b.order)
   );
 
-  // 현재 선택된 아이템의 인덱스 상태 추가
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  // Schema 컨텍스트에서 상태와 함수 가져오기
+  const {
+    selectedColumnId,
+    onColumnSelect,
+    updateColumnOrders,
+    getSelectedNode,
+  } = useSchema();
+
+  // 선택된 노드 가져오기
+  const selectedNode = getSelectedNode();
+  const nodeId = selectedNode?.id || "";
 
   const [isDragging, setIsDragging] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -23,19 +33,27 @@ function NodeList({
 
   const listRef = useRef<HTMLDivElement>(null);
 
+  // 현재 선택된 아이템의 인덱스 찾기
+  const getSelectedIndex = useCallback((): number | null => {
+    if (!selectedColumnId) return null;
+    const index = localColumns.findIndex((col) => col.id === selectedColumnId);
+    return index !== -1 ? index : null;
+  }, [localColumns, selectedColumnId]);
+
   // 아이템 클릭 이벤트 처리 함수
   const handleItemClick = useCallback(
     (index: number) => {
-      // 같은 아이템을 다시 클릭하면 선택 해제
-      if (selectedIndex === index) {
-        setSelectedIndex(null);
-      } else {
-        // 다른 아이템을 클릭하면 선택 변경
-        setSelectedIndex(index);
-      }
+      const column = localColumns[index];
+      console.log("Clicking column:", column.id, column.logicalName); // 디버깅 로그
+      onColumnSelect(column.id);
     },
-    [selectedIndex]
+    [localColumns, onColumnSelect]
   );
+
+  // columns prop이 변경되면 localColumns 업데이트
+  useEffect(() => {
+    setLocalColumns([...columns].sort((a, b) => a.order - b.order));
+  }, [columns]);
 
   // 그립 핸들에서 마우스 다운 이벤트 처리
   const handleGripMouseDown = useCallback(
@@ -123,29 +141,15 @@ function NodeList({
         order: index,
       }));
 
+      // 로컬 상태 업데이트
       setLocalColumns(columnsWithUpdatedOrder);
 
-      // 선택된 아이템의 인덱스 업데이트
-      if (selectedIndex !== null) {
-        if (selectedIndex === draggedIndex) {
-          // 선택된 아이템이 이동된 경우 새 인덱스로 업데이트
-          setSelectedIndex(dragOverIndex);
-        } else if (
-          selectedIndex > draggedIndex &&
-          selectedIndex <= dragOverIndex
-        ) {
-          // 선택된 아이템 앞에서 뒤로 이동한 경우
-          setSelectedIndex(selectedIndex - 1);
-        } else if (
-          selectedIndex < draggedIndex &&
-          selectedIndex >= dragOverIndex
-        ) {
-          // 선택된 아이템 뒤에서 앞으로 이동한 경우
-          setSelectedIndex(selectedIndex + 1);
-        }
+      // 컨텍스트를 통해 전역 상태 업데이트
+      if (nodeId) {
+        updateColumnOrders(nodeId, columnsWithUpdatedOrder);
       }
 
-      // 상위 컴포넌트에 변경 사항 전달
+      // 상위 컴포넌트에 변경 사항 전달 (필요한 경우)
       if (onColumnsChange) {
         onColumnsChange(columnsWithUpdatedOrder);
       }
@@ -171,7 +175,8 @@ function NodeList({
     dragOverIndex,
     localColumns,
     onColumnsChange,
-    selectedIndex,
+    nodeId,
+    updateColumnOrders,
   ]);
 
   // 마우스 이벤트 리스너 설정/제거
@@ -186,6 +191,9 @@ function NodeList({
       document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // 현재 선택된 인덱스 계산
+  const selectedIndex = getSelectedIndex();
 
   return (
     <div className="bg-white w-full h-full" ref={listRef}>

@@ -1,36 +1,30 @@
 "use client";
 import { getRandomBgColor } from "@/lib/utils";
 import { Copy, GripVertical, Sheet, Trash2 } from "lucide-react";
-import React, {
-  useState,
-  useRef,
-  ChangeEvent,
-  KeyboardEvent,
-  useEffect,
-} from "react";
+import React, { useRef, useState, KeyboardEvent } from "react";
 
 interface NodeHeaderProps {
   logicalName: string;
-  color: string;
+  color?: string;
+  onChange: (value: string) => void;
+  onDelete?: () => void;
+  onCopy?: () => void;
 }
 
 function NodeHeader({
   logicalName,
   color = "",
+  onChange,
+  onDelete,
+  onCopy,
 }: NodeHeaderProps): React.ReactElement {
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [name, setName] = useState<string>(logicalName);
+  const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // 랜덤 색상을 useRef로 저장하여 리렌더링에도 유지
+  const randomColorRef = useRef(color || getRandomBgColor());
 
-  // logicalName이 변경될 때마다 로컬 name 상태를 업데이트
-  useEffect(() => {
-    console.log("NodeHeader - logicalName 변경됨:", logicalName);
-    setName(logicalName);
-  }, [logicalName]); // logicalName이 변경될 때만 실행
-
-  const bgColorClass = React.useMemo(() => {
-    return color || getRandomBgColor();
-  }, [color]);
+  // 색상은 randomColorRef에서 가져옴
+  const bgColorClass = randomColorRef.current;
 
   const handleInputClick = (): void => {
     setIsEditing(true);
@@ -41,8 +35,8 @@ function NodeHeader({
     }, 0);
   };
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
-    setName(e.target.value);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    onChange(e.target.value);
   };
 
   const handleInputBlur = (): void => {
@@ -64,7 +58,7 @@ function NodeHeader({
         <input
           ref={inputRef}
           type="text"
-          value={name}
+          value={logicalName}
           onChange={handleInputChange}
           onClick={handleInputClick}
           onBlur={handleInputBlur}
@@ -77,10 +71,12 @@ function NodeHeader({
         <Trash2
           size={18}
           className="text-neutral-800 hover:text-destructive duration-200"
+          onClick={onDelete}
         />
         <Copy
           size={18}
           className="text-neutral-800 hover:text-neutral-100 duration-200"
+          onClick={onCopy}
         />
         <GripVertical
           size={18}
