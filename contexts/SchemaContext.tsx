@@ -1,4 +1,5 @@
 "use client";
+import { DataTypes } from "@/constants/datatype";
 import { initialNodes } from "@/sample";
 import { AppNode, Column } from "@/types/appNode";
 import {
@@ -27,6 +28,7 @@ interface SchemaContextType {
   updateNode: (nodeId: string, data: Partial<AppNode["data"]>) => void;
   addNode: (node: AppNode) => void;
   removeNode: (nodeId: string) => void;
+  addColumn: (nodeId: string) => void;
   updateEdges: (edges: Edge[]) => void;
   addEdge: (connection: Connection) => void;
   removeEdge: (edgeId: string) => void;
@@ -87,6 +89,36 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
 
   const removeNode = (nodeId: string) => {
     setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+  };
+
+  const addColumn = (nodeId: string) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === nodeId) {
+          const columns = [...(node.data.columns || [])];
+          const newColumnId = `col-${Date.now()}`;
+          const newColumn: Column = {
+            id: newColumnId,
+            logicalName: "새 컬럼",
+            physicalName: "NewColumn",
+            dataType: DataTypes.INT,
+            order: columns.length,
+            constraints: {},
+          };
+
+          columns.push(newColumn);
+          setSelectedColumnId(newColumnId);
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              columns,
+            },
+          };
+        }
+        return node;
+      })
+    );
   };
 
   const updateEdges = (newEdges: Edge[]) => {
@@ -173,6 +205,7 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     updateNode,
     addNode,
     removeNode,
+    addColumn,
     updateEdges,
     addEdge,
     removeEdge,

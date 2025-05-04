@@ -1,6 +1,7 @@
 "use client";
+import TooltipWrapper from "@/components/TooltipWrapper";
 import { getRandomBgColor } from "@/lib/utils";
-import { Copy, GripVertical, Sheet, Trash2 } from "lucide-react";
+import { Copy, Grid2X2Plus, GripVertical, Sheet, Trash2 } from "lucide-react";
 import React, { useRef, useState, KeyboardEvent } from "react";
 
 interface NodeHeaderProps {
@@ -9,6 +10,7 @@ interface NodeHeaderProps {
   onChange: (value: string) => void;
   onDelete?: () => void;
   onCopy?: () => void;
+  onAddColumn?: () => void;
 }
 
 function NodeHeader({
@@ -17,6 +19,7 @@ function NodeHeader({
   onChange,
   onDelete,
   onCopy,
+  onAddColumn,
 }: NodeHeaderProps): React.ReactElement {
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,16 +71,28 @@ function NodeHeader({
         />
       </div>
       <div className="flex justify-end gap-2 items-center">
-        <Trash2
-          size={18}
-          className="text-neutral-800 hover:text-destructive duration-200"
-          onClick={onDelete}
-        />
-        <Copy
-          size={18}
-          className="text-neutral-800 hover:text-neutral-100 duration-200"
-          onClick={onCopy}
-        />
+        <TooltipWrapper content={"컬럼을 추가합니다."}>
+          <Grid2X2Plus
+            size={18}
+            className="text-neutral-800 hover:text-neutral-100 duration-200"
+            onClick={onAddColumn}
+          />
+        </TooltipWrapper>
+        <TooltipWrapper content={"스키마를 삭제합니다."}>
+          <Trash2
+            size={18}
+            className="text-neutral-800 hover:text-destructive duration-200"
+            onClick={onDelete}
+          />
+        </TooltipWrapper>
+        <TooltipWrapper content={"스키마를 복제합니다."}>
+          <Copy
+            size={18}
+            className="text-neutral-800 hover:text-neutral-100 duration-200"
+            onClick={onCopy}
+          />
+        </TooltipWrapper>
+
         <GripVertical
           size={18}
           className="text-neutral-800 hover:text-neutral-100 duration-200"

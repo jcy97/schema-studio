@@ -27,12 +27,17 @@ const NodeComponent = memo((props: NodeProps) => {
     schema.updateNode(props.id, { [propertyKey]: value });
   };
 
+  const handleAddColumn = () => {
+    schema.addColumn(props.id);
+  };
+
   return (
     <NodeCard nodeId={props.id} isSelected={!!props.selected}>
       <NodeHeader
         logicalName={nodeData.logicalName}
         color={nodeData.color}
         onChange={(value) => onChange("logicalName", value as string)}
+        onAddColumn={handleAddColumn}
       />
       <NodeList
         columns={nodeData.columns}

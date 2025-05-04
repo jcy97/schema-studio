@@ -1,16 +1,17 @@
 // React Flow의 Node 타입을 확장
 import { Node } from "@xyflow/react";
 // 컬럼 데이터 타입 정의
-export type ColumnDataType =
-  | "int"
-  | "float"
-  | "decimal"
-  | "varchar"
-  | "char"
-  | "text"
-  | "date"
-  | "datetime"
-  | "boolean";
+export enum DataType {
+  INT = "int",
+  FLOAT = "float",
+  DECIMAL = "decimal",
+  VARCHAR = "varchar",
+  CHAR = "char",
+  TEXT = "text",
+  DATE = "date",
+  DATETIME = "datetime",
+  BOOLEAN = "boolean",
+}
 
 // 컬럼 제약조건 타입
 export interface ColumnConstraint {
@@ -60,5 +61,7 @@ export interface AppNodeData {
   description?: string; // 테이블 설명
   [key: string]: any; // 추가 속성을 위한 인덱스 시그니처
 }
+
+export type ColumnDataType = `${DataType}`;
 
 export type AppNode = Node<AppNodeData>;
