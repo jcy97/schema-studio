@@ -11,7 +11,9 @@ import {
   ToggleRight,
   Database,
   GripVertical,
+  Trash2,
 } from "lucide-react";
+import TooltipWrapper from "@/components/TooltipWrapper";
 
 function NodeItem({
   item,
@@ -19,12 +21,14 @@ function NodeItem({
   onGripMouseDown,
   isSelected,
   onItemClick,
+  onRemove,
 }: {
   item: Column;
   index: number;
   onGripMouseDown: (e: React.MouseEvent, index: number) => void;
   isSelected: boolean;
   onItemClick: (index: number) => void;
+  onRemove: (columnId: string) => void;
 }) {
   // 컬럼 유형에 따른 아이콘 렌더링 함수
   const renderColumnIcon = (): JSX.Element => {
@@ -77,6 +81,17 @@ function NodeItem({
         }}
       >
         <GripVertical className="w-4 h-4 text-gray-400" />
+      </div>
+      <div className="nodrag">
+        <TooltipWrapper content={"컬럼을 삭제합니다."}>
+          <Trash2
+            className="w-4 h-4 text-gray-400 hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove(item.id);
+            }}
+          />
+        </TooltipWrapper>
       </div>
     </div>
   );

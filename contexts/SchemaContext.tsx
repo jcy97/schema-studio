@@ -29,6 +29,7 @@ interface SchemaContextType {
   addNode: (node: AppNode) => void;
   removeNode: (nodeId: string) => void;
   addColumn: (nodeId: string) => void;
+  removeColumn: (nodeId: string, columnId: string) => void;
   updateEdges: (edges: Edge[]) => void;
   addEdge: (connection: Connection) => void;
   removeEdge: (edgeId: string) => void;
@@ -113,6 +114,33 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
             data: {
               ...node.data,
               columns,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  };
+
+  const removeColumn = (nodeId: string, columnId: string) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === nodeId) {
+          const filteredColumns = node.data.columns.filter(
+            (column) => column.id !== columnId
+          );
+          if (selectedColumnId === columnId) {
+            if (filteredColumns.length > 0) {
+              setSelectedColumnId(filteredColumns[0].id);
+            } else {
+              setSelectedColumnId(null);
+            }
+          }
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              columns: filteredColumns,
             },
           };
         }
@@ -206,6 +234,7 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     addNode,
     removeNode,
     addColumn,
+    removeColumn,
     updateEdges,
     addEdge,
     removeEdge,

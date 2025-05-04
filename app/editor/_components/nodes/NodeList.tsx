@@ -21,6 +21,7 @@ function NodeList({
     onColumnSelect,
     updateColumnOrders,
     getSelectedNode,
+    removeColumn,
   } = useSchema();
 
   // 선택된 노드 가져오기
@@ -195,6 +196,10 @@ function NodeList({
   // 현재 선택된 인덱스 계산
   const selectedIndex = getSelectedIndex();
 
+  const handleItemRemove = (columnId: string) => {
+    removeColumn(nodeId, columnId);
+  };
+
   return (
     <div className="bg-white w-full h-full" ref={listRef}>
       {localColumns.map((column, index) => (
@@ -205,6 +210,7 @@ function NodeList({
           onGripMouseDown={handleGripMouseDown}
           isSelected={selectedIndex === index}
           onItemClick={handleItemClick}
+          onRemove={handleItemRemove}
         />
       ))}
     </div>
