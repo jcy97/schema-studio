@@ -3,6 +3,8 @@ import { useSchema } from "@/contexts/SchemaContext";
 import React from "react";
 import TitleHeader from "./properties/TitleHeader";
 import EmptyPropertiesGuide from "./properties/EmptyPropertiesGuide";
+import { Separator } from "@/components/ui/separator";
+import ColumnProperty from "./properties/ColumnProperty";
 
 function Properties() {
   const schema = useSchema();
@@ -20,7 +22,7 @@ function Properties() {
   };
 
   return (
-    <div className="w-[340px] min-w-[340px] border-l-2 border-separate h-full p-2 px-4 overflow-auto bg-background">
+    <div className="flex flex-col gap-2 w-[340px] min-w-[340px] border-l-2 border-separate h-full p-2 px-4 overflow-auto bg-background">
       {selectedNode?.data ? (
         <>
           <TitleHeader
@@ -33,7 +35,8 @@ function Properties() {
               handlePropertyChange("physicalName", value as string)
             }
           />
-          {/* 여기에 다른 속성 섹션들 추가 가능 */}
+          <Separator />
+          <ColumnProperty />
         </>
       ) : (
         <EmptyPropertiesGuide />

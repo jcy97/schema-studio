@@ -17,7 +17,7 @@ function TitleHeader({
   return (
     <div className="flex flex-col">
       <div className="py-2">
-        <p className="font-bold">스키마 기본 정보</p>
+        <p className="text-lg font-bold">스키마 기본 정보</p>
       </div>
       <PropertyInput
         title="논리명"
