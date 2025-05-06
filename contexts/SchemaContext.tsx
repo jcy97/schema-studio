@@ -29,6 +29,7 @@ interface SchemaContextType {
   addNode: (node: AppNode) => void;
   removeNode: (nodeId: string) => void;
   addColumn: (nodeId: string) => void;
+  cloneNode: (nodeId: string) => void;
   removeColumn: (nodeId: string, columnId: string) => void;
   updateEdges: (edges: Edge[]) => void;
   addEdge: (connection: Connection) => void;
@@ -92,12 +93,64 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     setNodes((nds) => nds.filter((node) => node.id !== nodeId));
   };
 
+  const cloneNode = (nodeId: string) => {
+    const originNode = nodes.find((node) => node.id === nodeId);
+    if (!originNode) {
+      console.error("Node not found!");
+      return;
+    }
+    const newNodeId = `node-${Date.now()}`;
+
+    const clonedColumns = originNode.data.columns.map((column) => {
+      return {
+        ...column,
+        id: `col-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      };
+    });
+
+    const offsetX = 300;
+    const offsetY = 350;
+
+    const clonedNode: AppNode = {
+      ...originNode,
+      id: newNodeId,
+      position: {
+        x: originNode.position.x + offsetX,
+        y: originNode.position.y + offsetY,
+      },
+      selected: false,
+      data: {
+        ...originNode.data,
+        id: newNodeId,
+        columns: clonedColumns,
+        logicalName: `${originNode.data.logicalName}-copy`,
+        physicalName: `${originNode.data.physicalName}-copy`,
+      },
+    };
+
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        selected: false,
+      }))
+    );
+
+    setTimeout(() => {
+      addNode(clonedNode);
+      setTimeout(() => {
+        onNodeSelect(newNodeId);
+      }, 50);
+    }, 0);
+  };
+
   const addColumn = (nodeId: string) => {
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === nodeId) {
           const columns = [...(node.data.columns || [])];
-          const newColumnId = `col-${Date.now()}`;
+          const newColumnId = `col-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(2, 9)}`;
           const newColumn: Column = {
             id: newColumnId,
             logicalName: "새 컬럼",
@@ -233,6 +286,7 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     updateNode,
     addNode,
     removeNode,
+    cloneNode,
     addColumn,
     removeColumn,
     updateEdges,
