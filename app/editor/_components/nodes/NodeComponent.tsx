@@ -34,6 +34,9 @@ const NodeComponent = memo((props: NodeProps) => {
     schema.cloneNode(props.id);
   };
 
+  const handleRemoveNode = () => {
+    schema.removeNode(props.id);
+  };
   return (
     <NodeCard nodeId={props.id} isSelected={!!props.selected}>
       <NodeHeader
@@ -42,6 +45,7 @@ const NodeComponent = memo((props: NodeProps) => {
         onChange={(value) => onChange("logicalName", value as string)}
         onAddColumn={handleAddColumn}
         onCopy={handleCloneNode}
+        onRemove={handleRemoveNode}
       />
       <NodeList
         columns={nodeData.columns}

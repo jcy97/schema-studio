@@ -2,13 +2,13 @@
 import TooltipWrapper from "@/components/TooltipWrapper";
 import { getRandomBgColor } from "@/lib/utils";
 import { Copy, Grid2X2Plus, GripVertical, Sheet, Trash2 } from "lucide-react";
-import React, { useRef, useState, KeyboardEvent } from "react";
+import React, { useRef, useState, KeyboardEvent, useEffect } from "react";
 
 interface NodeHeaderProps {
   logicalName: string;
   color?: string;
   onChange: (value: string) => void;
-  onDelete?: () => void;
+  onRemove?: () => void;
   onCopy?: () => void;
   onAddColumn?: () => void;
 }
@@ -17,14 +17,20 @@ function NodeHeader({
   logicalName,
   color = "",
   onChange,
-  onDelete,
+  onRemove,
   onCopy,
   onAddColumn,
 }: NodeHeaderProps): React.ReactElement {
   const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState(logicalName);
+  const [isComposing, setIsComposing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   // 랜덤 색상을 useRef로 저장하여 리렌더링에도 유지
   const randomColorRef = useRef(color || getRandomBgColor());
+
+  useEffect(() => {
+    setInputValue(logicalName);
+  }, [logicalName]);
 
   // 색상은 randomColorRef에서 가져옴
   const bgColorClass = randomColorRef.current;
@@ -39,16 +45,34 @@ function NodeHeader({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    onChange(e.target.value);
+    setInputValue(e.target.value);
+    if (!isComposing) {
+      onChange(e.target.value);
+    }
+  };
+
+  const handleCompositionStart = (): void => {
+    setIsComposing(true);
+  };
+
+  const handleCompositionEnd = (
+    e: React.CompositionEvent<HTMLInputElement>
+  ): void => {
+    setIsComposing(false);
+    const composedValue = e.currentTarget.value;
+    onChange(composedValue);
   };
 
   const handleInputBlur = (): void => {
     setIsEditing(false);
+
+    onChange(inputValue);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !isComposing) {
       setIsEditing(false);
+      onChange(inputValue);
     }
   };
 
@@ -61,11 +85,13 @@ function NodeHeader({
         <input
           ref={inputRef}
           type="text"
-          value={logicalName}
+          value={inputValue}
           onChange={handleInputChange}
           onClick={handleInputClick}
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           readOnly={!isEditing}
           className="text-sm font-bold text-neutral-800 bg-transparent outline-none border-none"
         />
@@ -82,7 +108,7 @@ function NodeHeader({
           <Trash2
             size={18}
             className="text-neutral-800 hover:text-destructive duration-200"
-            onClick={onDelete}
+            onClick={onRemove}
           />
         </TooltipWrapper>
         <TooltipWrapper content={"스키마를 복제합니다."}>
