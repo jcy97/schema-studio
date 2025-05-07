@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { useReactFlow } from "@xyflow/react";
+import { Handle, Position, useReactFlow } from "@xyflow/react";
 import React from "react";
 
 function NodeCard({
@@ -12,6 +12,14 @@ function NodeCard({
   children: React.ReactNode;
 }) {
   const { getNode, setCenter } = useReactFlow();
+
+  // 핸들 스타일 - 모든 핸들에 공통으로 적용
+  const handleStyle = {
+    background: "#555",
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+  };
 
   return (
     <div
@@ -30,10 +38,66 @@ function NodeCard({
         });
       }}
       className={cn(
-        "rounded-md cursor-pointer bg-background border-2 border-separate w-[320px] h-[300px] text-xs gap-1 flex flex-col",
+        "rounded-md cursor-pointer bg-background border-2 border-separate w-[320px] h-[300px] text-xs gap-1 flex flex-col relative",
         isSelected && "border-primary"
       )}
     >
+      {/* 상단 핸들 - source와 target을 겹쳐서 배치 */}
+      <Handle
+        type="source"
+        position={Position.Top}
+        style={handleStyle}
+        id={`${nodeId}-top-source`}
+      />
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={handleStyle}
+        id={`${nodeId}-top-target`}
+      />
+
+      {/* 우측 핸들 */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={handleStyle}
+        id={`${nodeId}-right-source`}
+      />
+      <Handle
+        type="target"
+        position={Position.Right}
+        style={handleStyle}
+        id={`${nodeId}-right-target`}
+      />
+
+      {/* 하단 핸들 */}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        style={handleStyle}
+        id={`${nodeId}-bottom-source`}
+      />
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        style={handleStyle}
+        id={`${nodeId}-bottom-target`}
+      />
+
+      {/* 좌측 핸들 */}
+      <Handle
+        type="source"
+        position={Position.Left}
+        style={handleStyle}
+        id={`${nodeId}-left-source`}
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={handleStyle}
+        id={`${nodeId}-left-target`}
+      />
+
       {children}
     </div>
   );

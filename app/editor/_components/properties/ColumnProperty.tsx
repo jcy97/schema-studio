@@ -13,9 +13,19 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { ColumnDataType } from "@/types/appNode";
 import { DataTypes } from "@/constants/datatype";
+import { Card, CardContent } from "@/components/ui/card";
+import { Link } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 
 function ColumnProperty() {
-  const { getSelectedColumn, getSelectedNode, updateNode } = useSchema();
+  const {
+    getSelectedColumn,
+    getSelectedNode,
+    updateNode,
+    nodes,
+    relationships,
+    updateRelationship,
+  } = useSchema();
   const selectedColumn = getSelectedColumn();
   const selectedNode = getSelectedNode();
 
@@ -36,6 +46,111 @@ function ColumnProperty() {
       // 업데이트된 columns 배열로 노드 업데이트
       updateNode(selectedNode.id, { columns: updatedColumns });
     }
+  };
+
+  // 관계 정보 가져오기
+  const getForeignKeyInfo = () => {
+    if (!selectedColumn.constraints?.foreignKey) return null;
+    const { tableId, columnId } = selectedColumn.constraints.foreignKey;
+
+    const referencedTable = nodes.find((node) => node.id === tableId);
+    if (!referencedTable)
+      return {
+        tableName: "테이블을 찾을 수 없음",
+        columnName: "컬럼을 찾을 수 없음",
+      };
+
+    const referencedColumn = referencedTable.data.columns.find(
+      (col) => col.id === columnId
+    );
+    if (!referencedColumn)
+      return {
+        tableName: referencedTable.data.logicalName,
+        physicalTableName: referencedTable.data.physicalName,
+        columnName: "컬럼을 찾을 수 없음",
+      };
+    return {
+      tableName: referencedTable.data.logicalName,
+      physicalName: referencedTable.data.physicalName,
+      columnName: referencedColumn.logicalName,
+      physicalColumnName: referencedColumn.physicalName,
+    };
+  };
+
+  //관계 찾기
+  const findRelatedRelationship = () => {
+    if (!selectedColumn.constraints?.foreignKey) return null;
+
+    // 현재 선택된 컬럼이 타겟 컬럼인 관계 찾기
+    return relationships.find(
+      (rel) =>
+        rel.targetTableId === selectedNode.id &&
+        rel.targetColumnIds.includes(selectedColumn.id)
+    );
+  };
+  //관계 설명 업데이트
+  const handleRelationshipDescriptionChange = (description: string) => {
+    const relationship = findRelatedRelationship();
+    if (relationship) {
+      updateRelationship(relationship.id, { description });
+    }
+  };
+
+  //관계 정보 렌더링
+  const renderForeignKeyInfo = () => {
+    if (!selectedColumn.constraints?.foreignKey) return null;
+    const fkInfo = getForeignKeyInfo();
+    if (!fkInfo) return null;
+
+    const relationship = findRelatedRelationship();
+    return (
+      <Card className="mt-4">
+        <CardContent className="pt-4">
+          <div className="flex items-center mb-2">
+            <Link className="w-4 h-4 text-purple-600 mr-2" />
+            <h4 className="text-sm font-semibold text-purple-600">
+              외래키 참조 정보
+            </h4>
+          </div>
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="font-semibold">참조 테이블</span>{" "}
+              {fkInfo.tableName}
+              <span className="text-xs text-gray-500 ml-l">
+                ({fkInfo.physicalTableName})
+              </span>
+            </div>
+            <div>
+              <span className="font-semibold">참조 컬럼</span>{" "}
+              {fkInfo.columnName}
+              <span className="text-xs text-gray-500 ml-l">
+                ({fkInfo.physicalColumnName})
+              </span>
+            </div>
+            {relationship && (
+              <div className="mt-3">
+                <Label
+                  htmlFor="relationshipDescription"
+                  className="font-semibold"
+                >
+                  관계 설명
+                </Label>
+                <Textarea
+                  id="relationshipDescription"
+                  value={relationship.description || ""}
+                  onChange={(e) =>
+                    handleRelationshipDescriptionChange(e.target.value)
+                  }
+                  placeholder="이 관계에 대한 설명을 입력하세요"
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
@@ -67,6 +182,7 @@ function ColumnProperty() {
           onValueChange={(value) =>
             handleColumnChange("dataType", value as ColumnDataType)
           }
+          disabled={!!selectedColumn.constraints?.foreignKey}
         >
           <SelectTrigger>
             <SelectValue placeholder="데이터 타입 선택" />
@@ -81,6 +197,8 @@ function ColumnProperty() {
         </Select>
       </div>
 
+      {/* 외래키 참조 정보 */}
+      {renderForeignKeyInfo()}
       <Separator />
 
       <h4 className="font-medium">제약조건</h4>
@@ -96,6 +214,7 @@ function ColumnProperty() {
               isPrimaryKey: checked,
             })
           }
+          disabled={!!selectedColumn.constraints?.foreignKey}
         />
       </div>
 

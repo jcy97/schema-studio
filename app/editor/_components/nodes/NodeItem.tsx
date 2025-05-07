@@ -12,6 +12,7 @@ import {
   Database,
   GripVertical,
   Trash2,
+  Link,
 } from "lucide-react";
 import TooltipWrapper from "@/components/TooltipWrapper";
 
@@ -35,6 +36,10 @@ function NodeItem({
     // Primary Key인 경우 Key 아이콘 반환
     if (item.constraints.isPrimaryKey) {
       return <Key className="w-4 h-4 text-yellow-600 mr-2" />;
+    }
+    // Foreign Key인 경우 Key 아이콘 반환
+    if (item.constraints.foreignKey) {
+      return <Link className="w-4 h-4 text-purple-600 mr-2" />;
     }
 
     // Primary Key가 아닌 경우 데이터 타입에 따라 아이콘 반환
@@ -60,6 +65,20 @@ function NodeItem({
     }
   };
 
+  //FK 또는 PK 표시 뱃지
+  const renderConstraintBadge = () => {
+    if (item.constraints.isPrimaryKey) {
+      return (
+        <span className="text-xs font-semibold text-yellow-600 ml-1">PK</span>
+      );
+    }
+    if (item.constraints.foreignKey) {
+      return (
+        <span className="text-xs font-semibold text-purple-600 ml-1">FK</span>
+      );
+    }
+    return null;
+  };
   return (
     <div
       className={`flex items-center p-2 border-b border-gray-100  cursor-pointer ${
@@ -70,6 +89,7 @@ function NodeItem({
     >
       {renderColumnIcon()}
       <p className="font-medium">{item.logicalName}</p>
+      {renderConstraintBadge()}
       <span className="text-xs text-gray-500 ml-2">({item.physicalName})</span>
       {/* nodrag를 통해 노드 드래그 이벤트 비활성화 */}
       <div

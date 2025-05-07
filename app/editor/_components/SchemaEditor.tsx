@@ -1,16 +1,16 @@
 "use client";
-import { initialNodes } from "@/sample";
 import { AppNode } from "@/types/appNode";
 import {
   Background,
   BackgroundVariant,
+  Connection,
   Controls,
   Edge,
   ReactFlow,
   ReactFlowProps,
   useReactFlow,
 } from "@xyflow/react";
-import React, { useEffect } from "react";
+import React, { useCallback } from "react";
 import DeleteableEdge from "./edges/DeletableEdge";
 import NodeComponent from "./nodes/NodeComponent";
 import "@xyflow/react/dist/style.css";
@@ -24,22 +24,24 @@ const nodeTypes = {
 
 const edgeTypes = {
   default: DeleteableEdge,
+  deletableEdge: DeleteableEdge,
 };
 
 const snapGrid: [number, number] = [50, 50];
 const fitViewOptions = { padding: 1 };
 
 function SchemaEditor() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onNodeSelect, addNode } =
-    useSchema();
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    onNodeSelect,
+    addNode,
+    addEdge,
+  } = useSchema();
   const reactFlowInstance = useReactFlow();
 
-  useEffect(() => {
-    console.log("노드 상태 변경됨:", nodes);
-    // 필요한 경우 여기서 후속 작업 수행
-  }, [nodes]);
-
-  //Selection 확인
   const onNodeSelectionChange = (data: ReactFlowProps<AppNode, Edge>) => {
     if (!data.nodes) return;
     const selectedNode = data.nodes.find((node) => node.selected === true);
@@ -49,7 +51,6 @@ function SchemaEditor() {
 
   const handleAddNode = () => {
     const newNodeId = addNode();
-
     setTimeout(() => {
       const addedNode = reactFlowInstance.getNode(newNodeId);
       if (!addedNode) return;
@@ -62,6 +63,13 @@ function SchemaEditor() {
     }, 100);
   };
 
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      addEdge(connection);
+    },
+    [addEdge]
+  );
+
   return (
     <main className="w-full h-full">
       <ReactFlow
@@ -71,6 +79,7 @@ function SchemaEditor() {
         onEdgesChange={onEdgesChange}
         onNodesChange={onNodesChange}
         onSelectionChange={onNodeSelectionChange}
+        onConnect={onConnect}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         snapToGrid

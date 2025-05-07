@@ -1,5 +1,5 @@
 // React Flow의 Node 타입을 확장
-import { Node } from "@xyflow/react";
+import { Edge, Node } from "@xyflow/react";
 // 컬럼 데이터 타입 정의
 export enum DataType {
   INT = "int",
@@ -11,6 +11,14 @@ export enum DataType {
   DATE = "date",
   DATETIME = "datetime",
   BOOLEAN = "boolean",
+}
+
+// 관계 타입 정의
+export enum RelationshipType {
+  ONE_TO_ONE = "ONE_TO_ONE",
+  ONE_TO_MANY = "ONE_TO_MANY",
+  MANY_TO_ONE = "MANY_TO_ONE",
+  MANY_TO_MANY = "MANY_TO_MANY",
 }
 
 // 컬럼 제약조건 타입
@@ -62,6 +70,48 @@ export interface AppNodeData {
   [key: string]: any; // 추가 속성을 위한 인덱스 시그니처
 }
 
+// 관계 정의 인터페이스
+export interface Relationship {
+  id: string;
+  name: string; // 관계 이름
+  type: RelationshipType;
+  sourceTableId: string;
+  sourceColumnIds: string[]; // 여러 컬럼으로 구성된 관계 지원
+  targetTableId: string;
+  targetColumnIds: string[];
+
+  // N:M 관계를 위한 정보
+  junctionTable?: {
+    tableId: string;
+    sourceColumnIds: string[];
+    targetColumnIds: string[];
+  };
+
+  // 관계 옵션
+  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+  onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+  description?: string;
+}
+
+// 전체 스키마 인터페이스
+export interface ERDiagramSchema {
+  nodes: AppNode[];
+  relationships: Relationship[];
+}
+
 export type ColumnDataType = `${DataType}`;
 
 export type AppNode = Node<AppNodeData>;
+
+export interface RelationshipEdgeData extends Record<string, unknown> {
+  relationship: Relationship;
+}
+
+export interface RelationshipEdge extends Edge {
+  data?: RelationshipEdgeData;
+}
+
+export interface EdgeHandleInfo {
+  sourceHandle: string | null;
+  targetHandle: string | null;
+}
