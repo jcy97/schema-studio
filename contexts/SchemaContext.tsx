@@ -1,5 +1,6 @@
 "use client";
 import { DataTypes } from "@/constants/datatype";
+import { getRandomBgColor } from "@/lib/utils";
 import { initialNodes } from "@/sample";
 import { AppNode, Column } from "@/types/appNode";
 import {
@@ -26,7 +27,7 @@ interface SchemaContextType {
   edges: Edge[];
   selectedColumnId: string | null;
   updateNode: (nodeId: string, data: Partial<AppNode["data"]>) => void;
-  addNode: (node: AppNode) => void;
+  addNode: (node?: AppNode) => string;
   removeNode: (nodeId: string) => void;
   addColumn: (nodeId: string) => void;
   cloneNode: (nodeId: string) => void;
@@ -85,8 +86,63 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     );
   };
 
-  const addNode = (node: AppNode) => {
-    setNodes((nds) => [...nds, node]);
+  const addNode = (customNode?: AppNode) => {
+    const newNodeId = customNode?.id || `node-${Date.now()}`;
+
+    let nodeToAdd: AppNode;
+    if (customNode) {
+      nodeToAdd = customNode;
+    } else {
+      let newX = 100;
+      let newY = 100;
+      if (nodes.length > 0) {
+        const rightmostNode = nodes.reduce((prev, current) => {
+          return prev.position.x > current.position.x ? prev : current;
+        });
+        const bottommostNode = nodes.reduce((prev, current) => {
+          return prev.position.y > current.position?.y ? prev : current;
+        });
+        newX = rightmostNode.position.x + 400;
+        newY = bottommostNode.position.y;
+
+        const estimatedViewportWidth = 1500;
+        if (newX > estimatedViewportWidth) {
+          newX = 100;
+          newY = bottommostNode.position.y + 400;
+        }
+      }
+      nodeToAdd = {
+        id: newNodeId,
+        type: "SchemaNode",
+        position: { x: newX, y: newY },
+        data: {
+          id: newNodeId,
+          logicalName: "새 스키마",
+          physicalName: "NEW-TB",
+          color: getRandomBgColor(),
+          columns: [
+            {
+              id: `col-${Date.now()}`,
+              logicalName: "ID",
+              physicalName: "ID",
+              dataType: DataTypes.INT,
+              order: 0,
+              constraints: {
+                isPrimaryKey: true,
+                isNotNull: true,
+              },
+            },
+          ],
+        },
+      };
+    }
+    setNodes((nds) => [...nds, nodeToAdd]);
+
+    setTimeout(() => {
+      onNodeSelect(nodeToAdd.id);
+    }, 50);
+
+    return nodeToAdd.id;
   };
 
   const removeNode = (nodeId: string) => {
