@@ -17,6 +17,7 @@ import "@xyflow/react/dist/style.css";
 import { useSchema } from "@/contexts/SchemaContext";
 import { Plus, Save, Play, FilePlus2 } from "lucide-react"; // 아이콘 추가
 import TooltipWrapper from "@/components/TooltipWrapper";
+import GenerateSqlDialog from "./GenerateSqlDialog";
 
 const nodeTypes = {
   SchemaNode: NodeComponent,
@@ -39,7 +40,6 @@ function SchemaEditor() {
     onNodeSelect,
     addNode,
     addEdge,
-    generateSqlDDL, // SQL 생성 함수 추가
   } = useSchema();
   const reactFlowInstance = useReactFlow();
 
@@ -62,12 +62,6 @@ function SchemaEditor() {
         { zoom: 1, duration: 500 }
       );
     }, 100);
-  };
-
-  const handleGenerateSQL = () => {
-    const sql = generateSqlDDL();
-    console.log("Generated SQL:", sql);
-    // 여기에 SQL 모달 표시 등의 로직 추가 가능
   };
 
   const handleSave = () => {
@@ -130,15 +124,9 @@ function SchemaEditor() {
               <Save size={20} />
             </div>
           </TooltipWrapper>
-
-          {/* SQL 생성/실행 버튼 */}
           <TooltipWrapper content="SQL을 생성합니다">
-            <div
-              className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
-              cursor-pointer shadow-md"
-              onClick={handleGenerateSQL}
-            >
-              <Play size={20} />
+            <div>
+              <GenerateSqlDialog />
             </div>
           </TooltipWrapper>
 

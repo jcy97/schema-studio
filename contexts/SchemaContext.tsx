@@ -1,5 +1,7 @@
 "use client";
 import { DataTypes } from "@/constants/datatype";
+import { SQLGenerationOptions } from "@/lib/dbms";
+import { generateDDLForSelectedNodes } from "@/lib/ddlGenerator";
 import { getRandomBgColor } from "@/lib/utils";
 import { initialEdges, initialNodes, initialRelationships } from "@/sample";
 import {
@@ -67,7 +69,10 @@ interface SchemaContextType {
   updateColumnOrders: (nodeId: string, updateColumns: Column[]) => void;
 
   // SQL 생성 관련 메서드
-  generateSqlDDL: () => string;
+  generateSqlDDLForSelectedNodes: (
+    selectedNodeIds: string[],
+    options: SQLGenerationOptions
+  ) => string;
 }
 
 const SchemaContext = createContext<SchemaContextType | undefined>(undefined);
@@ -633,136 +638,17 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     );
   };
 
-  // SQL DDL 생성 함수
-  const generateSqlDDL = useCallback(() => {
-    let sql = "";
-
-    // 테이블 생성 SQL
-    nodes.forEach((node) => {
-      sql += `-- ${node.data.logicalName} 테이블\n`;
-      sql += `CREATE TABLE ${node.data.physicalName} (\n`;
-
-      // 컬럼 정의
-      const columnDefinitions = node.data.columns.map((column) => {
-        let colDef = `  ${
-          column.physicalName
-        } ${column.dataType.toUpperCase()}`;
-
-        // 데이터 타입 옵션 (길이, 정밀도 등)
-        if (column.typeOptions) {
-          if (column.dataType === "varchar" || column.dataType === "char") {
-            colDef += `(${column.typeOptions.length || 255})`;
-          } else if (column.dataType === "decimal") {
-            colDef += `(${column.typeOptions.precision || 10}, ${
-              column.typeOptions.scale || 2
-            })`;
-          }
-        }
-
-        // NOT NULL
-        if (column.constraints.isNotNull) {
-          colDef += " NOT NULL";
-        }
-
-        // 기본값
-        if (column.constraints.defaultValue !== undefined) {
-          if (typeof column.constraints.defaultValue === "string") {
-            colDef += ` DEFAULT '${column.constraints.defaultValue}'`;
-          } else {
-            colDef += ` DEFAULT ${column.constraints.defaultValue}`;
-          }
-        }
-
-        return colDef;
-      });
-
-      // 기본키 제약조건
-      const primaryKeyColumns = node.data.columns
-        .filter((column) => column.constraints.isPrimaryKey)
-        .map((column) => column.physicalName);
-
-      if (primaryKeyColumns.length > 0) {
-        columnDefinitions.push(
-          `  PRIMARY KEY (${primaryKeyColumns.join(", ")})`
-        );
-      }
-
-      // UNIQUE 제약조건
-      node.data.columns
-        .filter(
-          (column) =>
-            column.constraints.isUnique && !column.constraints.isPrimaryKey
-        )
-        .forEach((column) => {
-          columnDefinitions.push(`  UNIQUE (${column.physicalName})`);
-        });
-
-      // CHECK 제약조건
-      node.data.columns
-        .filter((column) => column.constraints.check)
-        .forEach((column) => {
-          columnDefinitions.push(`  CHECK (${column.constraints.check})`);
-        });
-
-      sql += columnDefinitions.join(",\n");
-      sql += "\n);\n\n";
-    });
-
-    // 외래키 제약조건 (관계 기반)
-    relationships.forEach((rel) => {
-      if (rel.type === RelationshipType.MANY_TO_MANY) {
-        return; // N:M 관계는 중간 테이블에 외래키가 정의됨
-      }
-
-      const sourceNode = nodes.find((node) => node.id === rel.sourceTableId);
-      const targetNode = nodes.find((node) => node.id === rel.targetTableId);
-
-      if (!sourceNode || !targetNode) return;
-
-      const sourceColumns = rel.sourceColumnIds
-        .map((colId) => {
-          const column = sourceNode.data.columns.find(
-            (col) => col.id === colId
-          );
-          return column?.physicalName || "";
-        })
-        .filter((name) => name);
-
-      const targetColumns = rel.targetColumnIds
-        .map((colId) => {
-          const column = targetNode.data.columns.find(
-            (col) => col.id === colId
-          );
-          return column?.physicalName || "";
-        })
-        .filter((name) => name);
-
-      if (sourceColumns.length === 0 || targetColumns.length === 0) return;
-
-      const constraintName = `FK_${targetNode.data.physicalName}_${sourceNode.data.physicalName}`;
-
-      sql += `-- ${rel.name} 관계의 외래키\n`;
-      sql += `ALTER TABLE ${targetNode.data.physicalName} ADD CONSTRAINT ${constraintName}\n`;
-      sql += `  FOREIGN KEY (${targetColumns.join(", ")})\n`;
-      sql += `  REFERENCES ${
-        sourceNode.data.physicalName
-      } (${sourceColumns.join(", ")})`;
-
-      // ON DELETE, ON UPDATE 규칙
-      if (rel.onDelete) {
-        sql += `\n  ON DELETE ${rel.onDelete}`;
-      }
-
-      if (rel.onUpdate) {
-        sql += `\n  ON UPDATE ${rel.onUpdate}`;
-      }
-
-      sql += ";\n\n";
-    });
-
-    return sql;
-  }, [nodes, relationships]);
-
+  const generateSqlDDLForSelectedNodes = useCallback(
+    (selectedNodeIds: string[], options: SQLGenerationOptions) => {
+      return generateDDLForSelectedNodes(
+        selectedNodeIds,
+        nodes,
+        relationships,
+        options
+      );
+    },
+    [nodes, relationships]
+  );
   const value: SchemaContextType = {
     nodes,
     edges,
@@ -790,7 +676,7 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     onRelationshipSelect,
     getSelectedRelationship,
     updateColumnOrders,
-    generateSqlDDL,
+    generateSqlDDLForSelectedNodes,
   };
 
   return (
