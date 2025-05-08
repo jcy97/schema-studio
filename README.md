@@ -1,4 +1,5 @@
-# SchemaStudio 🏗️
+# SchemaStudio
+<img width="197" alt="Image" src="https://github.com/user-attachments/assets/ce4d1e91-3a97-4620-a6d9-8265f52ae97b" />
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yourusername/schema-studio/blob/main/LICENSE)
 [![Open Source Love](https://badges.frapsoft.com/os/v1/open-source.svg?v=103)](https://github.com/ellerbrock/open-source-badges/)
@@ -9,7 +10,6 @@ SchemaStudio is an open-source web application that allows you to visually desig
 
 ✨ **Free and open-source alternative to commercial schema design tools!**
 
-![SchemaStudio Demo](https://via.placeholder.com/800x400?text=SchemaStudio+Demo)
 
 ## ✨ Features
 
