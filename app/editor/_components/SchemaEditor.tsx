@@ -15,7 +15,7 @@ import DeleteableEdge from "./edges/DeletableEdge";
 import NodeComponent from "./nodes/NodeComponent";
 import "@xyflow/react/dist/style.css";
 import { useSchema } from "@/contexts/SchemaContext";
-import { Plus } from "lucide-react";
+import { Plus, Save, Play, FilePlus2 } from "lucide-react"; // 아이콘 추가
 import TooltipWrapper from "@/components/TooltipWrapper";
 
 const nodeTypes = {
@@ -39,6 +39,7 @@ function SchemaEditor() {
     onNodeSelect,
     addNode,
     addEdge,
+    generateSqlDDL, // SQL 생성 함수 추가
   } = useSchema();
   const reactFlowInstance = useReactFlow();
 
@@ -61,6 +62,22 @@ function SchemaEditor() {
         { zoom: 1, duration: 500 }
       );
     }, 100);
+  };
+
+  const handleGenerateSQL = () => {
+    const sql = generateSqlDDL();
+    console.log("Generated SQL:", sql);
+    // 여기에 SQL 모달 표시 등의 로직 추가 가능
+  };
+
+  const handleSave = () => {
+    console.log("저장 기능 실행");
+    // 저장 로직 추가
+  };
+
+  const handleNewFile = () => {
+    console.log("새 파일 생성");
+    // 새 파일 생성 로직 추가
   };
 
   const onConnect = useCallback(
@@ -89,15 +106,53 @@ function SchemaEditor() {
       >
         <Controls position="top-left" fitViewOptions={fitViewOptions} />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-        <TooltipWrapper content="새 스키마를 추가합니다.">
-          <div
-            className="absolute top-4 right-4 w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
-        cursor-pointer shadow-md z-10"
-            onClick={handleAddNode}
-          >
-            <Plus size={24} />
-          </div>
-        </TooltipWrapper>
+
+        {/* 액션 버튼 그룹 */}
+        <div className="absolute top-4 right-4 flex space-x-3 z-10">
+          {/* 새 파일 생성 버튼 */}
+          <TooltipWrapper content="새 파일을 생성합니다">
+            <div
+              className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
+              cursor-pointer shadow-md"
+              onClick={handleNewFile}
+            >
+              <FilePlus2 size={20} />
+            </div>
+          </TooltipWrapper>
+
+          {/* 저장 버튼 */}
+          <TooltipWrapper content="현재 작업을 저장합니다">
+            <div
+              className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
+              cursor-pointer shadow-md"
+              onClick={handleSave}
+            >
+              <Save size={20} />
+            </div>
+          </TooltipWrapper>
+
+          {/* SQL 생성/실행 버튼 */}
+          <TooltipWrapper content="SQL을 생성합니다">
+            <div
+              className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
+              cursor-pointer shadow-md"
+              onClick={handleGenerateSQL}
+            >
+              <Play size={20} />
+            </div>
+          </TooltipWrapper>
+
+          {/* 새 스키마 추가 버튼 */}
+          <TooltipWrapper content="새 스키마를 추가합니다">
+            <div
+              className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
+              cursor-pointer shadow-md"
+              onClick={handleAddNode}
+            >
+              <Plus size={20} />
+            </div>
+          </TooltipWrapper>
+        </div>
       </ReactFlow>
     </main>
   );

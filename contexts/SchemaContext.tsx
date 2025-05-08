@@ -234,12 +234,14 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     }
     const newNodeId = `node-${Date.now()}`;
 
-    const clonedColumns = originNode.data.columns.map((column) => {
-      return {
-        ...column,
-        id: `col-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      };
-    });
+    const clonedColumns = originNode.data.columns
+      .filter((column) => !column.constraints.foreignKey)
+      .map((column) => {
+        return {
+          ...column,
+          id: `col-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        };
+      });
 
     const offsetX = 300;
     const offsetY = 350;
