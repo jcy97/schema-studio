@@ -1,4 +1,3 @@
-# SchemaStudio
 <img width="197" alt="Image" src="https://github.com/user-attachments/assets/ce4d1e91-3a97-4620-a6d9-8265f52ae97b" />
 
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yourusername/schema-studio/blob/main/LICENSE)
