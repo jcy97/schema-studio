@@ -78,10 +78,8 @@ interface SchemaContextType {
 const SchemaContext = createContext<SchemaContextType | undefined>(undefined);
 
 export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>(initialNodes);
-  const [relationships, setRelationships] = useState<Relationship[]>(
-    initialRelationships || []
-  );
+  const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>([]);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string>("");
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);

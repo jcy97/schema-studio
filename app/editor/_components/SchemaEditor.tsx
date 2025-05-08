@@ -1,5 +1,5 @@
 "use client";
-import { AppNode } from "@/types/appNode";
+import { AppNode, Relationship } from "@/types/appNode";
 import {
   Background,
   BackgroundVariant,
@@ -9,8 +9,10 @@ import {
   ReactFlow,
   ReactFlowProps,
   useReactFlow,
+  NodeChange,
+  NodeRemoveChange,
 } from "@xyflow/react";
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import DeleteableEdge from "./edges/DeletableEdge";
 import NodeComponent from "./nodes/NodeComponent";
 import "@xyflow/react/dist/style.css";
@@ -18,6 +20,8 @@ import { useSchema } from "@/contexts/SchemaContext";
 import { Plus, Save, Play, FilePlus2 } from "lucide-react"; // 아이콘 추가
 import TooltipWrapper from "@/components/TooltipWrapper";
 import GenerateSqlDialog from "./GenerateSqlDialog";
+import SchemaFileDialog from "./SchemaFileDialog";
+import { FileService, SchemaFile } from "@/services/fileService";
 
 const nodeTypes = {
   SchemaNode: NodeComponent,
@@ -32,16 +36,75 @@ const snapGrid: [number, number] = [50, 50];
 const fitViewOptions = { padding: 1 };
 
 function SchemaEditor() {
+  // 스키마 컨텍스트에서 필요한 메서드와 상태 가져오기
+  const schema = useSchema();
   const {
     nodes,
     edges,
+    relationships,
     onNodesChange,
     onEdgesChange,
     onNodeSelect,
     addNode,
     addEdge,
-  } = useSchema();
+    removeNode,
+    addRelationship,
+  } = schema;
+
+  // 파일 관리를 위한 상태
+  const [isFileDialogOpen, setIsFileDialogOpen] = useState<boolean>(false);
+  const [currentFile, setCurrentFile] = useState<{
+    name: string;
+    lastModified: string;
+  } | null>(null);
+  const [isFileDirty, setIsFileDirty] = useState<boolean>(false);
+
   const reactFlowInstance = useReactFlow();
+
+  // 컴포넌트 마운트 시 초기 파일 확인
+  useEffect(() => {
+    // 로컬스토리지에서 현재 파일 정보 확인
+    const storedFile = localStorage.getItem("currentSchemaFile");
+
+    if (storedFile) {
+      try {
+        const fileInfo = JSON.parse(storedFile);
+        setCurrentFile(fileInfo);
+      } catch (e) {
+        console.error("저장된 파일 정보 로드 실패:", e);
+        // 파일 정보가 손상된 경우 파일 다이얼로그 표시
+        setIsFileDialogOpen(true);
+      }
+    } else {
+      // 현재 관리 중인 파일이 없으면 다이얼로그 표시
+      setIsFileDialogOpen(true);
+    }
+  }, []);
+
+  // 노드, 엣지, 관계 변경 시 파일 상태 갱신
+  useEffect(() => {
+    if (currentFile) {
+      setIsFileDirty(true);
+    }
+  }, [nodes, edges, relationships]);
+
+  // 창 닫기 전 저장 확인
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isFileDirty) {
+        const message =
+          "저장되지 않은 변경사항이 있습니다. 페이지를 떠나시겠습니까?";
+        e.returnValue = message;
+        return message;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isFileDirty]);
 
   const onNodeSelectionChange = (data: ReactFlowProps<AppNode, Edge>) => {
     if (!data.nodes) return;
@@ -64,14 +127,171 @@ function SchemaEditor() {
     }, 100);
   };
 
-  const handleSave = () => {
-    console.log("저장 기능 실행");
-    // 저장 로직 추가
+  // 스키마 데이터 초기화 (새 파일 생성 시 사용)
+  const resetSchemaData = () => {
+    try {
+      // 1. 각 노드를 제거하는 변경사항 생성
+      if (nodes && nodes.length > 0) {
+        const removeChanges: NodeRemoveChange[] = nodes.map((node) => ({
+          type: "remove",
+          id: node.id,
+        }));
+
+        // 변경사항 적용
+        onNodesChange(removeChanges);
+      }
+
+      console.log("스키마 데이터 초기화 완료");
+    } catch (error) {
+      console.error("스키마 데이터 초기화 오류:", error);
+    }
   };
 
+  // 파일 저장 처리
+  const handleSave = () => {
+    if (!currentFile) {
+      // 현재 관리 중인 파일이 없으면 새 파일 다이얼로그 표시
+      setIsFileDialogOpen(true);
+      return;
+    }
+
+    // 파일 저장
+    FileService.saveSchemaToFile(currentFile.name, nodes, relationships, {
+      name: currentFile.name,
+      lastModified: new Date().toISOString(),
+    });
+
+    // 파일 상태 업데이트
+    setCurrentFile({
+      ...currentFile,
+      lastModified: new Date().toISOString(),
+    });
+
+    setIsFileDirty(false);
+
+    // 사용자에게 저장 안내 메시지 표시
+    alert(
+      `${currentFile.name}.scst 파일이 다운로드 되었습니다.\n다운로드 폴더를 확인해주세요.`
+    );
+
+    console.log("스키마 저장 완료:", currentFile.name);
+  };
+
+  // 새 파일 생성 다이얼로그 표시
   const handleNewFile = () => {
-    console.log("새 파일 생성");
-    // 새 파일 생성 로직 추가
+    setIsFileDialogOpen(true);
+  };
+
+  // 새 파일 생성 처리
+  const handleCreateFile = (fileName: string, description: string) => {
+    // 기존 스키마 데이터 초기화
+    resetSchemaData();
+
+    // 빈 스키마 데이터로 새 파일 생성
+    FileService.saveSchemaToFile(
+      fileName,
+      [], // 빈 노드 배열
+      [], // 빈 관계 배열
+      {
+        name: fileName,
+        description: description,
+        createdAt: new Date().toISOString(),
+      }
+    );
+
+    // 현재 파일 정보 업데이트
+    setCurrentFile({
+      name: fileName,
+      lastModified: new Date().toISOString(),
+    });
+
+    setIsFileDirty(false);
+
+    console.log("새 스키마 파일 생성:", fileName);
+  };
+
+  // 관계 추가 함수
+  const addRelationships = (relationshipsToAdd: Relationship[]) => {
+    if (!relationshipsToAdd || relationshipsToAdd.length === 0) return;
+
+    // 각 관계를 개별적으로 추가
+    relationshipsToAdd.forEach((rel) => {
+      try {
+        if (typeof addRelationship === "function") {
+          addRelationship(rel);
+        }
+      } catch (err) {
+        console.error("관계 추가 오류:", err);
+      }
+    });
+  };
+
+  // 기존 파일 열기 처리
+  const handleOpenFile = (schemaFile: SchemaFile) => {
+    try {
+      console.log("로드할 파일 데이터:", schemaFile); // 디버깅용
+
+      // 유효성 검사
+      if (!Array.isArray(schemaFile.nodes)) {
+        throw new Error("파일 형식 오류: 노드 배열이 없거나 유효하지 않습니다");
+      }
+
+      // 1. 기존 노드 모두 삭제
+      resetSchemaData();
+
+      // 2. 새 노드 추가
+      // 위치 정보 및 타입 확인하고 기본값 추가
+      const validNodes = schemaFile.nodes.map((node) => ({
+        ...node,
+        position: node.position || { x: 0, y: 0 },
+        type: node.type || "SchemaNode",
+      }));
+
+      // 관계 정보 저장 (노드 추가 후 적용할 예정)
+      const validRelationships = schemaFile.relationships || [];
+
+      // 각 노드를 개별적으로 추가
+      setTimeout(() => {
+        if (validNodes && validNodes.length > 0) {
+          // 각 노드에 대해 수동으로 addNode 호출
+          validNodes.forEach((node) => {
+            addNode(node);
+          });
+
+          console.log("노드 추가 완료:", validNodes.length);
+
+          // 노드 추가 후 관계 추가
+          setTimeout(() => {
+            if (validRelationships.length > 0) {
+              addRelationships(validRelationships);
+              console.log("관계 추가 완료:", validRelationships.length);
+            }
+
+            // 화면 업데이트
+            setTimeout(() => {
+              reactFlowInstance.fitView();
+            }, 200);
+          }, 300);
+        }
+      }, 100);
+
+      // 현재 파일 정보 업데이트
+      setCurrentFile({
+        name: schemaFile.metadata.name,
+        lastModified: new Date().toISOString(),
+      });
+
+      setIsFileDirty(false);
+
+      console.log("스키마 파일 로드 완료:", schemaFile.metadata.name);
+    } catch (error) {
+      console.error("스키마 파일 로드 오류:", error);
+      alert(
+        `스키마 파일 로드 중 오류가 발생했습니다: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
   };
 
   const onConnect = useCallback(
@@ -86,7 +306,6 @@ function SchemaEditor() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        //자동 저장 구현을 원할경우 아래 체인지 함수에 뮤테이션 걸어주면 된다.
         onEdgesChange={onEdgesChange}
         onNodesChange={onNodesChange}
         onSelectionChange={onNodeSelectionChange}
@@ -100,6 +319,13 @@ function SchemaEditor() {
       >
         <Controls position="top-left" fitViewOptions={fitViewOptions} />
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+
+        {/* 파일 상태 표시 */}
+        {currentFile && (
+          <div className="absolute top-4 left-28 bg-white/80 px-3 py-1 rounded-md shadow-sm text-sm">
+            {currentFile.name}.scst {isFileDirty && "*"}
+          </div>
+        )}
 
         {/* 액션 버튼 그룹 */}
         <div className="absolute top-4 right-4 flex space-x-3 z-10">
@@ -117,8 +343,8 @@ function SchemaEditor() {
           {/* 저장 버튼 */}
           <TooltipWrapper content="현재 작업을 저장합니다">
             <div
-              className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
-              cursor-pointer shadow-md"
+              className={`w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
+              cursor-pointer shadow-md ${isFileDirty ? "animate-pulse" : ""}`}
               onClick={handleSave}
             >
               <Save size={20} />
@@ -142,6 +368,14 @@ function SchemaEditor() {
           </TooltipWrapper>
         </div>
       </ReactFlow>
+
+      {/* 파일 다이얼로그 */}
+      <SchemaFileDialog
+        isOpen={isFileDialogOpen}
+        onClose={() => setIsFileDialogOpen(false)}
+        onCreateFile={handleCreateFile}
+        onOpenFile={handleOpenFile}
+      />
     </main>
   );
 }
