@@ -34,7 +34,9 @@ function PropertyInput({
 
   return (
     <div className="flex items-center mb-2">
-      <div className="w-24 text-sm font-medium text-gray-700">{title}:</div>
+      <div className="w-24 text-sm font-medium text-gray-700 dark:text-white">
+        {title}:
+      </div>
 
       {type === "text" ? (
         <input

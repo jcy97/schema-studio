@@ -132,7 +132,7 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid grid-cols-2 mb-4">
             <TabsTrigger value="new">새 파일 만들기</TabsTrigger>
-            <TabsTrigger value="open">기존 파일 열기</TabsTrigger>
+            <TabsTrigger value="open">불러오기</TabsTrigger>
           </TabsList>
 
           <TabsContent value="new" className="space-y-4">

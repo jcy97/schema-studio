@@ -81,16 +81,20 @@ function NodeItem({
   };
   return (
     <div
-      className={`flex items-center p-2 border-b border-gray-100  cursor-pointer ${
-        isSelected ? "bg-blue-50" : "hover:bg-gray-50"
+      className={`flex items-center p-2 border-b border-gray-100 dark:border-gray-700 cursor-pointer ${
+        isSelected
+          ? "bg-blue-50 dark:bg-blue-900/30"
+          : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
       }`}
       data-index={index}
       onClick={() => onItemClick(index)}
     >
       {renderColumnIcon()}
-      <p className="font-medium">{item.logicalName}</p>
+      <p className="font-medium dark:text-gray-700">{item.logicalName}</p>
       {renderConstraintBadge()}
-      <span className="text-xs text-gray-500 ml-2">({item.physicalName})</span>
+      <span className="text-xs text-gray-500 dark:text-gray-700 ml-2">
+        ({item.physicalName})
+      </span>
       {/* nodrag를 통해 노드 드래그 이벤트 비활성화 */}
       <div
         className="ml-auto cursor-grab nodrag"
@@ -100,12 +104,12 @@ function NodeItem({
           onGripMouseDown(e, index);
         }}
       >
-        <GripVertical className="w-4 h-4 text-gray-400" />
+        <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-700" />
       </div>
       <div className="nodrag">
         <TooltipWrapper content={"컬럼을 삭제합니다."}>
           <Trash2
-            className="w-4 h-4 text-gray-400 hover:text-destructive"
+            className="w-4 h-4 text-gray-400 hover:text-destructive dark:text-gray-700 dark:hover:text-red-400"
             onClick={(e) => {
               e.stopPropagation();
               onRemove(item.id);

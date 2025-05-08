@@ -38,8 +38,10 @@ function NodeCard({
         });
       }}
       className={cn(
-        "rounded-md cursor-pointer bg-background border-2 border-separate w-[320px] h-[300px] text-xs gap-1 flex flex-col relative",
-        isSelected && "border-primary"
+        "rounded-md cursor-pointer bg-background dark:bg-gray-800 border-2 border-separate w-[320px] h-[300px] text-xs gap-1 flex flex-col relative",
+        isSelected
+          ? "border-primary dark:border-blue-500"
+          : "border-gray-200 dark:border-gray-700"
       )}
     >
       {/* 상단 핸들 - source와 target을 겹쳐서 배치 */}

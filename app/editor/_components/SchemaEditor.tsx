@@ -11,6 +11,7 @@ import {
   useReactFlow,
   NodeChange,
   NodeRemoveChange,
+  ColorMode,
 } from "@xyflow/react";
 import React, { useCallback, useEffect, useState } from "react";
 import DeleteableEdge from "./edges/DeletableEdge";
@@ -22,6 +23,7 @@ import TooltipWrapper from "@/components/TooltipWrapper";
 import GenerateSqlDialog from "./GenerateSqlDialog";
 import SchemaFileDialog from "./SchemaFileDialog";
 import { FileService, SchemaFile } from "@/services/fileService";
+import { useTheme } from "next-themes";
 
 const nodeTypes = {
   SchemaNode: NodeComponent,
@@ -36,6 +38,8 @@ const snapGrid: [number, number] = [50, 50];
 const fitViewOptions = { padding: 1 };
 
 function SchemaEditor() {
+  // 테마 모드
+  const { theme } = useTheme();
   // 스키마 컨텍스트에서 필요한 메서드와 상태 가져오기
   const schema = useSchema();
   const {
@@ -314,6 +318,7 @@ function SchemaEditor() {
         edgeTypes={edgeTypes}
         snapToGrid
         snapGrid={snapGrid}
+        colorMode={theme as ColorMode}
         fitViewOptions={fitViewOptions}
         fitView
       >
@@ -322,7 +327,7 @@ function SchemaEditor() {
 
         {/* 파일 상태 표시 */}
         {currentFile && (
-          <div className="absolute top-4 left-28 bg-white/80 px-3 py-1 rounded-md shadow-sm text-sm">
+          <div className="absolute top-4 left-28 bg-white/80 px-3 py-1 border rounded-md shadow-sm text-sm dark:bg-background dark:text-white">
             {currentFile.name}.scst {isFileDirty && "*"}
           </div>
         )}

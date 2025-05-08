@@ -81,7 +81,7 @@ function NodeHeader({
       className={`w-full rounded-t-sm flex justify-between items-center p-2 ${bgColorClass}`}
     >
       <div className="flex justify-start items-center gap-2">
-        <Sheet size={18} className="text-neutral-800" />
+        <Sheet size={18} className="text-neutral-800 dark:text-neutral-900" />
         <input
           ref={inputRef}
           type="text"
@@ -93,35 +93,35 @@ function NodeHeader({
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           readOnly={!isEditing}
-          className="text-sm font-bold text-neutral-800 bg-transparent outline-none border-none"
+          className="text-sm font-bold text-neutral-800 dark:text-neutral-900 bg-transparent outline-none border-none"
         />
       </div>
       <div className="flex justify-end gap-2 items-center">
         <TooltipWrapper content={"컬럼을 추가합니다."}>
           <Grid2X2Plus
             size={18}
-            className="text-neutral-800 hover:text-neutral-100 duration-200"
+            className="text-neutral-800 dark:text-neutral-900 hover:text-neutral-100 dark:hover:text-neutral-200 duration-200"
             onClick={onAddColumn}
           />
         </TooltipWrapper>
         <TooltipWrapper content={"스키마를 삭제합니다."}>
           <Trash2
             size={18}
-            className="text-neutral-800 hover:text-destructive duration-200"
+            className="text-neutral-800 dark:text-neutral-900 hover:text-destructive dark:hover:text-red-500 duration-200"
             onClick={onRemove}
           />
         </TooltipWrapper>
         <TooltipWrapper content={"스키마를 복제합니다."}>
           <Copy
             size={18}
-            className="text-neutral-800 hover:text-neutral-100 duration-200"
+            className="text-neutral-800 dark:text-neutral-900 hover:text-neutral-100 dark:hover:text-neutral-200 duration-200"
             onClick={onCopy}
           />
         </TooltipWrapper>
 
         <GripVertical
           size={18}
-          className="text-neutral-800 hover:text-neutral-100 duration-200"
+          className="text-neutral-800 dark:text-neutral-900 hover:text-neutral-100 dark:hover:text-neutral-200 duration-200"
         />
       </div>
     </div>
