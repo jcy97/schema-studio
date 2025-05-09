@@ -12,13 +12,22 @@ export function quoteIdentifier(
   if (!quote) return identifier;
 
   // 이미 따옴표가 적용된 경우 중복 방지
-  if (identifier.startsWith(quote) && identifier.endsWith(quote)) {
+  if (
+    (quote === "[" && identifier.startsWith("[") && identifier.endsWith("]")) ||
+    (quote !== "[" &&
+      identifier.startsWith(quote) &&
+      identifier.endsWith(quote))
+  ) {
     return identifier;
+  }
+
+  // SQL Server의 경우 닫는 괄호를 ']'로 처리
+  if (quote === "[") {
+    return `[${identifier}]`;
   }
 
   return `${quote}${identifier}${quote}`;
 }
-
 /**
  * DBMS별 식별자 따옴표 반환
  */
