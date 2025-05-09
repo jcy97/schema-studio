@@ -1,7 +1,7 @@
-// services/fileService.ts
 import { getRandomBgColor } from "@/lib/utils";
 import { AppNode, Relationship, RelationshipType } from "@/types/appNode";
 import { Edge } from "@xyflow/react";
+import { GoogleDriveService } from "./googleDriveService";
 
 export interface SchemaFileMetadata {
   name: string;
@@ -82,7 +82,7 @@ export class FileService {
     const a = document.createElement("a");
     a.href = url;
     a.download = `${fileName}.scst`;
-    a.click();
+    //a.click();
 
     // 메모리 정리
     URL.revokeObjectURL(url);
@@ -207,5 +207,66 @@ export class FileService {
 
       reader.readAsText(file);
     });
+  }
+  static async saveSchemaToGoogleDrive(
+    fileName: string,
+    nodes: AppNode[],
+    relationships: Relationship[],
+    metadata: Partial<SchemaFileMetadata> = {},
+    existingFileId?: string
+  ): Promise<string> {
+    const schemaFile = this.createSchemaFileContent(
+      nodes,
+      relationships,
+      metadata
+    );
+
+    const fileContent = JSON.stringify(schemaFile, null, 2);
+
+    try {
+      const fileId = await GoogleDriveService.saveFile(
+        fileName,
+        fileContent,
+        existingFileId,
+        metadata.description
+      );
+
+      // 로컬스토리지에 현재 파일 정보 저장 (Google Drive ID 포함)
+      const fileInfo = {
+        name: fileName,
+        lastModified: new Date().toISOString(),
+        description: metadata.description,
+        googleDriveId: fileId,
+      };
+
+      localStorage.setItem("currentSchemaFile", JSON.stringify(fileInfo));
+
+      return fileId;
+    } catch (error) {
+      console.error("Google Drive 저장 실패:", error);
+      throw error;
+    }
+  }
+
+  static async loadSchemaFromGoogleDrive(fileId: string): Promise<SchemaFile> {
+    try {
+      const fileContent = await GoogleDriveService.getFileContent(fileId);
+      const parsedFile = this.parseSchemaFile(JSON.stringify(fileContent));
+
+      // Google Drive ID를 포함한 파일 정보 저장
+      const fileInfo = {
+        name: parsedFile.metadata.name,
+        lastModified: new Date().toISOString(),
+        description: parsedFile.metadata.description,
+        googleDriveId: fileId,
+      };
+
+      localStorage.setItem("currentSchemaFile", JSON.stringify(fileInfo));
+
+      return parsedFile;
+    } catch (error) {
+      console.error("Google Drive 파일 로드 실패:", error);
+      throw error;
+    }
   }
 }

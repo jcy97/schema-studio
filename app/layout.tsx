@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import NextAuthSessionProvider from "@/components/providers/NextAuthSessionProvder";
 
 export const metadata: Metadata = {
   title: "Schema Studio",
@@ -21,7 +22,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body className={`${pretendard.variable} antialiased`}>{children}</body>
+      <body className={`${pretendard.variable} antialiased`}>
+        <NextAuthSessionProvider>{children}</NextAuthSessionProvider>
+      </body>
     </html>
   );
 }

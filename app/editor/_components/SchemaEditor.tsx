@@ -24,6 +24,8 @@ import GenerateSqlDialog from "./GenerateSqlDialog";
 import SchemaFileDialog from "./SchemaFileDialog";
 import { FileService, SchemaFile } from "@/services/fileService";
 import { useTheme } from "next-themes";
+import { useSession } from "next-auth/react";
+import { CloudIcon, Loader2 } from "lucide-react";
 
 const nodeTypes = {
   SchemaNode: NodeComponent,
@@ -60,10 +62,18 @@ function SchemaEditor() {
   const [currentFile, setCurrentFile] = useState<{
     name: string;
     lastModified: string;
+    googleDriveId?: string;
   } | null>(null);
   const [isFileDirty, setIsFileDirty] = useState<boolean>(false);
 
   const reactFlowInstance = useReactFlow();
+  const { data: session } = useSession();
+
+  const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(
+    null
+  );
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // 컴포넌트 마운트 시 초기 파일 확인
   useEffect(() => {
@@ -110,6 +120,74 @@ function SchemaEditor() {
     };
   }, [isFileDirty]);
 
+  // 자동 저장 타이머 설정
+  useEffect(() => {
+    if (autoSaveEnabled && currentFile && session?.accessToken && isFileDirty) {
+      // 이전 타이머 취소
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+      }
+
+      // 10초 후에 자동 저장 (원하는 시간으로 조정 가능)
+      const timer = setTimeout(() => {
+        handleAutoSave();
+      }, 10000);
+
+      setAutoSaveTimer(timer);
+
+      return () => {
+        if (timer) clearTimeout(timer);
+      };
+    }
+  }, [
+    nodes,
+    edges,
+    relationships,
+    autoSaveEnabled,
+    currentFile,
+    session,
+    isFileDirty,
+  ]);
+
+  // 자동 저장 토글 함수
+  const toggleAutoSave = () => {
+    if (!session) {
+      alert("자동 저장을 사용하려면 Google 계정으로 로그인해야 합니다.");
+      return;
+    }
+
+    setAutoSaveEnabled(!autoSaveEnabled);
+  };
+
+  // 자동 저장 함수
+  const handleAutoSave = async () => {
+    if (!currentFile || !session || !isFileDirty) return;
+
+    try {
+      await FileService.saveSchemaToGoogleDrive(
+        currentFile.name,
+        nodes,
+        relationships,
+        {
+          name: currentFile.name,
+          lastModified: new Date().toISOString(),
+        },
+        currentFile.googleDriveId
+      );
+
+      // 파일 상태 업데이트
+      setCurrentFile({
+        ...currentFile,
+        lastModified: new Date().toISOString(),
+      });
+
+      setIsFileDirty(false);
+      console.log("자동 저장 완료:", currentFile.name);
+    } catch (error) {
+      console.error("자동 저장 오류:", error);
+    }
+  };
+
   const onNodeSelectionChange = (data: ReactFlowProps<AppNode, Edge>) => {
     if (!data.nodes) return;
     const selectedNode = data.nodes.find((node) => node.selected === true);
@@ -151,34 +229,108 @@ function SchemaEditor() {
     }
   };
 
-  // 파일 저장 처리
-  const handleSave = () => {
+  // Google Drive 파일 저장 처리
+  const handleSave = async () => {
     if (!currentFile) {
       // 현재 관리 중인 파일이 없으면 새 파일 다이얼로그 표시
       setIsFileDialogOpen(true);
       return;
     }
 
-    // 파일 저장
-    FileService.saveSchemaToFile(currentFile.name, nodes, relationships, {
-      name: currentFile.name,
-      lastModified: new Date().toISOString(),
-    });
+    setIsLoading(true);
 
-    // 파일 상태 업데이트
-    setCurrentFile({
-      ...currentFile,
-      lastModified: new Date().toISOString(),
-    });
+    try {
+      if (session) {
+        // Google Drive에 저장
+        const fileId = await FileService.saveSchemaToGoogleDrive(
+          currentFile.name,
+          nodes,
+          relationships,
+          {
+            name: currentFile.name,
+            lastModified: new Date().toISOString(),
+          },
+          currentFile.googleDriveId
+        );
 
-    setIsFileDirty(false);
+        // 파일 상태 업데이트
+        setCurrentFile({
+          ...currentFile,
+          lastModified: new Date().toISOString(),
+          googleDriveId: fileId,
+        });
 
-    // 사용자에게 저장 안내 메시지 표시
-    alert(
-      `${currentFile.name}.scst 파일이 다운로드 되었습니다.\n다운로드 폴더를 확인해주세요.`
-    );
+        setIsFileDirty(false);
+        alert(`${currentFile.name}.scst 파일이 Google Drive에 저장되었습니다.`);
+      } else {
+        // 로그인되지 않은 경우 로컬 저장으로 폴백
+        FileService.saveSchemaToFile(currentFile.name, nodes, relationships, {
+          name: currentFile.name,
+          lastModified: new Date().toISOString(),
+        });
 
-    console.log("스키마 저장 완료:", currentFile.name);
+        // 파일 상태 업데이트
+        setCurrentFile({
+          ...currentFile,
+          lastModified: new Date().toISOString(),
+        });
+
+        setIsFileDirty(false);
+
+        // 사용자에게 저장 안내 메시지 표시
+        alert(
+          `${currentFile.name}.scst 파일이 다운로드 되었습니다.\n다운로드 폴더를 확인해주세요.`
+        );
+      }
+    } catch (error) {
+      console.error("파일 저장 오류:", error);
+      alert(
+        `파일 저장 중 오류가 발생했습니다: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Google Drive 파일 열기 처리
+  const handleOpenGoogleDriveFile = async (fileId: string) => {
+    if (!session?.accessToken) {
+      alert("Google Drive 파일에 접근하려면 로그인이 필요합니다.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Google Drive에서 파일 로드
+      const schemaFile = await FileService.loadSchemaFromGoogleDrive(fileId);
+
+      // 파일 정보 업데이트
+      const fileInfo = {
+        name: schemaFile.metadata.name,
+        lastModified: new Date().toISOString(),
+        googleDriveId: fileId,
+      };
+
+      // 스키마 로드 (기존 코드와 동일)
+      await handleOpenFile(schemaFile);
+
+      // 파일 정보 업데이트
+      setCurrentFile(fileInfo);
+
+      console.log("Google Drive에서 파일 로드 완료:", schemaFile.metadata.name);
+    } catch (error) {
+      console.error("Google Drive 파일 로드 오류:", error);
+      alert(
+        `Google Drive 파일 로드 중 오류가 발생했습니다: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // 새 파일 생성 다이얼로그 표시
@@ -355,6 +507,20 @@ function SchemaEditor() {
               <Save size={20} />
             </div>
           </TooltipWrapper>
+          {/* UI에 자동 저장 토글 버튼 추가 */}
+          <TooltipWrapper
+            content={autoSaveEnabled ? "자동 저장 끄기" : "자동 저장 켜기"}
+          >
+            <div
+              className={`w-10 h-10 ${
+                autoSaveEnabled ? "bg-green-500" : "bg-gray-400"
+              } hover:opacity-80 text-white rounded-full flex items-center justify-center
+    cursor-pointer shadow-md`}
+              onClick={toggleAutoSave}
+            >
+              <CloudIcon size={20} />
+            </div>
+          </TooltipWrapper>
           <TooltipWrapper content="SQL을 생성합니다">
             <div>
               <GenerateSqlDialog />
@@ -380,6 +546,7 @@ function SchemaEditor() {
         onClose={() => setIsFileDialogOpen(false)}
         onCreateFile={handleCreateFile}
         onOpenFile={handleOpenFile}
+        onOpenGoogleDriveFile={handleOpenGoogleDriveFile}
       />
     </main>
   );

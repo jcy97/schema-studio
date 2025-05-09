@@ -41,3 +41,9 @@ export function getRandomBgColor(): string {
   // 테일윈드 클래스 문자열 반환
   return `bg-${randomColor}-${randomShade}`;
 }
+
+// 날짜 형식화
+export const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleString();
+};
