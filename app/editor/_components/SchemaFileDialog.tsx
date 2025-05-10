@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { FilePlusIcon, X } from "lucide-react";
+import { FilePlusIcon, X, RefreshCw, FolderOpen } from "lucide-react";
 import { SchemaFile } from "@/services/fileService";
 import { useSession, signIn } from "next-auth/react";
 import { CloudIcon, Loader2 } from "lucide-react";
@@ -34,10 +34,26 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // 구글 드라이브 처리
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [isLoadingDriveFiles, setIsLoadingDriveFiles] =
     useState<boolean>(false);
+  const [isOpeningFile, setIsOpeningFile] = useState<boolean>(false); // 파일 열기 로딩 상태
   const [driveFiles, setDriveFiles] = useState<any[]>([]);
+  const [selectedFile, setSelectedFile] = useState<any | null>(null); // 선택된 파일 상태 추가
+
+  const [sessionError, setSessionError] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (status === "unauthenticated" && sessionError) {
+      // 이미 세션 오류 상태를 표시 중이면 더 이상 처리하지 않음
+      return;
+    }
+
+    if (status === "unauthenticated" && activeTab === "open" && isOpen) {
+      setSessionError(true);
+      setError("인증 세션이 만료되었습니다. 다시 로그인해주세요.");
+    }
+  }, [status, activeTab, isOpen]);
 
   // 다이얼로그가 열릴 때 초기화
   useEffect(() => {
@@ -45,6 +61,7 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
       setFileName("");
       setDescription("");
       setError(null);
+      setSelectedFile(null); // 선택된 파일 초기화
     }
   }, [isOpen]);
 
@@ -57,18 +74,30 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
 
   // Google Drive 파일 로드 함수
   const loadDriveFiles = async () => {
-    if (!session) return;
+    if (!session) {
+      setSessionError(true);
+      setError("세션이 없습니다. 로그인이 필요합니다.");
+      return;
+    }
 
     setIsLoadingDriveFiles(true);
+    setSelectedFile(null); // 파일 로드 시 선택 초기화
+
     try {
       const files = await GoogleDriveService.listSchemaFiles();
       setDriveFiles(files);
+      // 파일 로드 성공 시 세션 오류 상태 초기화
+      setSessionError(false);
     } catch (err) {
-      setError(
-        `Google Drive 파일 로드 오류: ${
-          err instanceof Error ? err.message : String(err)
-        }`
-      );
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // 인증 관련 오류 감지
+      if (errorMessage.includes("인증") || errorMessage.includes("로그인")) {
+        setSessionError(true);
+        // 세션 오류 시 특별 UI 표시를 위한 상태 설정
+      }
+
+      setError(`Google Drive 파일 로드 오류: ${errorMessage}`);
     } finally {
       setIsLoadingDriveFiles(false);
     }
@@ -76,6 +105,11 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
 
   // Google Drive 파일 열기 핸들러
   const handleOpenGoogleDriveFile = async (fileId: string) => {
+    if (!fileId) return;
+
+    setIsOpeningFile(true); // 파일 열기 로딩 상태 활성화
+    setError(null);
+
     try {
       await onOpenGoogleDriveFile(fileId);
       onClose();
@@ -85,6 +119,8 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
           err instanceof Error ? err.message : String(err)
         }`
       );
+    } finally {
+      setIsOpeningFile(false); // 로딩 상태 비활성화
     }
   };
 
@@ -103,6 +139,19 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
       );
     }
   };
+
+  // 세션 오류 시 처리되는 컴포넌트
+  const renderSessionErrorMessage = () => (
+    <div className="text-center py-6 bg-red-50 rounded-md">
+      <CloudIcon className="h-10 w-10 mb-2 mx-auto text-red-500" />
+      <p className="text-sm font-medium mb-3 text-red-600">
+        {error || "인증 세션이 만료되었습니다. 다시 로그인해주세요."}
+      </p>
+      <Button onClick={() => signIn("google")}>
+        Google 계정으로 다시 로그인
+      </Button>
+    </div>
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -130,6 +179,8 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
                   Google 계정으로 로그인
                 </Button>
               </div>
+            ) : sessionError ? (
+              renderSessionErrorMessage()
             ) : (
               <>
                 <div>
@@ -192,9 +243,32 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
                   Google 계정으로 로그인
                 </Button>
               </div>
+            ) : sessionError ? (
+              renderSessionErrorMessage()
             ) : (
               <>
-                <div className="border rounded-md">
+                <div className="relative border rounded-md">
+                  {/* 새로고침 버튼을 우측 상단에 배치 */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1 p-1 h-8 w-8"
+                    onClick={() => loadDriveFiles()}
+                    disabled={isLoadingDriveFiles || isOpeningFile}
+                  >
+                    <RefreshCw
+                      size={16}
+                      className={isLoadingDriveFiles ? "animate-spin" : ""}
+                    />
+                  </Button>
+
+                  {/* 파일 목록 상단에 안내 문구 */}
+                  {!isLoadingDriveFiles && driveFiles.length > 0 && (
+                    <div className="p-2 bg-gray-50 border-b text-xs text-center text-muted-foreground">
+                      파일을 선택한 후 하단의 '열기' 버튼을 클릭하세요
+                    </div>
+                  )}
+
                   {isLoadingDriveFiles ? (
                     <div className="p-8 text-center">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-muted-foreground" />
@@ -209,8 +283,10 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
                       {driveFiles.map((file) => (
                         <div
                           key={file.id}
-                          className="p-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer flex justify-between items-center"
-                          onClick={() => handleOpenGoogleDriveFile(file.id)}
+                          className={`p-3 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer flex justify-between items-center ${
+                            selectedFile?.id === file.id ? "bg-blue-50" : ""
+                          }`}
+                          onClick={() => setSelectedFile(file)}
                         >
                           <div>
                             <p className="font-medium text-sm">{file.name}</p>
@@ -236,14 +312,31 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
                 )}
 
                 <div className="flex justify-end space-x-2 pt-4">
-                  <Button variant="outline" onClick={onClose}>
+                  <Button
+                    variant="outline"
+                    onClick={onClose}
+                    disabled={isOpeningFile}
+                  >
+                    <X size={16} className="mr-2" />
                     취소
                   </Button>
                   <Button
-                    onClick={() => loadDriveFiles()}
-                    disabled={isLoadingDriveFiles}
+                    onClick={() => handleOpenGoogleDriveFile(selectedFile?.id)}
+                    disabled={
+                      !selectedFile || isOpeningFile || isLoadingDriveFiles
+                    }
                   >
-                    새로고침
+                    {isOpeningFile ? (
+                      <>
+                        <Loader2 size={16} className="mr-2 animate-spin" />
+                        불러오는 중...
+                      </>
+                    ) : (
+                      <>
+                        <FolderOpen size={16} className="mr-2" />
+                        열기
+                      </>
+                    )}
                   </Button>
                 </div>
               </>

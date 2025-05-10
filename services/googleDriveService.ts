@@ -1,10 +1,39 @@
 export class GoogleDriveService {
+  static async validateSession() {
+    try {
+      const response = await fetch("/api/auth/session");
+      const data = await response.json();
+
+      if (!data.user) {
+        // 세션이 없으면 false 반환
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("세션 검증 오류:", error);
+      return false;
+    }
+  }
+
   /**
    * .scst 파일 목록 가져오기
    */
   static async listSchemaFiles() {
     try {
+      // 세션 유효성 먼저 검사
+      const isValidSession = await this.validateSession();
+      if (!isValidSession) {
+        throw new Error("인증 세션이 만료되었습니다. 다시 로그인해주세요.");
+      }
+
       const response = await fetch("/api/drive/list-files");
+
+      // 인증 오류 특별 처리
+      if (response.status === 401) {
+        throw new Error("인증이 만료되었습니다. 다시 로그인해주세요.");
+      }
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(

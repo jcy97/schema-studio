@@ -26,6 +26,7 @@ import { FileService, SchemaFile } from "@/services/fileService";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import { CloudIcon, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const nodeTypes = {
   SchemaNode: NodeComponent,
@@ -261,7 +262,7 @@ function SchemaEditor() {
         });
 
         setIsFileDirty(false);
-        alert(`${currentFile.name}.scst 파일이 Google Drive에 저장되었습니다.`);
+        toast.success(`파일이 저장되었습니다.`);
       } else {
         // 로그인되지 않은 경우 로컬 저장으로 폴백
         FileService.saveSchemaToFile(currentFile.name, nodes, relationships, {
