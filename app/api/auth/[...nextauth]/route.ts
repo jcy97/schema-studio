@@ -28,6 +28,7 @@ export const authOptions = {
     },
     async session({ session, token }: any) {
       session.accessToken = token.accessToken;
+      session.expiresAt = token.expiresAt;
       return session;
     },
   },

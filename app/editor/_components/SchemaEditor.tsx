@@ -68,13 +68,54 @@ function SchemaEditor() {
   const [isFileDirty, setIsFileDirty] = useState<boolean>(false);
 
   const reactFlowInstance = useReactFlow();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(
     null
   );
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const isSessionExpired = () => {
+    if (!session || !session.expiresAt) {
+      return true; // 세션 정보가 없으면 만료된 것으로 간주
+    }
+
+    // 현재 시간과 만료 시간 비교 (expiresAt은 UNIX 타임스탬프)
+    const currentTime = Math.floor(Date.now() / 1000);
+    return currentTime >= session.expiresAt;
+  };
+
+  useEffect(() => {
+    // 로그인되어 있고 Google Drive 파일을 사용 중인데 세션이 만료된 경우
+    if (
+      status === "authenticated" &&
+      currentFile?.googleDriveId &&
+      isSessionExpired()
+    ) {
+      // 세션 만료 처리
+      setIsFileDialogOpen(true);
+      toast.error("Google 계정 세션이 만료되었습니다. 다시 로그인해주세요.");
+    }
+  }, [status, session, currentFile]);
+
+  // 세션 상태 변화 감지
+  useEffect(() => {
+    // 구글 드라이브 ID가 있는 파일이 선택되어 있고, 세션이 없는 경우
+    if (
+      currentFile?.googleDriveId &&
+      status === "unauthenticated" &&
+      !isFileDialogOpen
+    ) {
+      // 세션이 끊어졌으므로 파일 다이얼로그 표시
+      setIsFileDialogOpen(true);
+
+      // 드라이브 관련 작업이 필요한 파일은 세션이 필요함을 알림
+      toast.error(
+        "Google 계정 세션이 만료되었습니다. 다시 로그인하거나 다른 파일을 선택해주세요."
+      );
+    }
+  }, [status, currentFile, isFileDialogOpen]);
 
   // 컴포넌트 마운트 시 초기 파일 확인
   useEffect(() => {
@@ -367,6 +408,17 @@ function SchemaEditor() {
     console.log("새 스키마 파일 생성:", fileName);
   };
 
+  const handleCloseFileDialog = () => {
+    // 현재 파일이 없는 상태에서는 다이얼로그를 닫지 않음
+    if (!currentFile) {
+      // 사용자에게 파일 선택이 필요하다는 메시지 표시
+      toast.error("작업을 시작하려면 파일을 생성하거나 선택해야 합니다.");
+      return;
+    }
+
+    setIsFileDialogOpen(false);
+  };
+
   // 관계 추가 함수
   const addRelationships = (relationshipsToAdd: Relationship[]) => {
     if (!relationshipsToAdd || relationshipsToAdd.length === 0) return;
@@ -543,8 +595,8 @@ function SchemaEditor() {
 
       {/* 파일 다이얼로그 */}
       <SchemaFileDialog
-        isOpen={isFileDialogOpen}
-        onClose={() => setIsFileDialogOpen(false)}
+        isOpen={isFileDialogOpen || !currentFile}
+        onClose={handleCloseFileDialog}
         onCreateFile={handleCreateFile}
         onOpenFile={handleOpenFile}
         onOpenGoogleDriveFile={handleOpenGoogleDriveFile}

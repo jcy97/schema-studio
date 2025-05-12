@@ -12,6 +12,7 @@ import { useSession, signIn } from "next-auth/react";
 import { CloudIcon, Loader2 } from "lucide-react";
 import { GoogleDriveService } from "@/services/googleDriveService";
 import { formatDate } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface SchemaFileDialogProps {
   isOpen: boolean;
@@ -43,18 +44,54 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
 
   const [sessionError, setSessionError] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (status === "unauthenticated" && sessionError) {
-      // 이미 세션 오류 상태를 표시 중이면 더 이상 처리하지 않음
-      return;
+  // 세션 만료 여부 확인
+  const isSessionExpired = () => {
+    if (!session || !session.expiresAt) {
+      return true;
     }
 
+    const currentTime = Math.floor(Date.now() / 1000);
+    return currentTime >= session.expiresAt;
+  };
+
+  // 세션 상태 확인 및 처리
+  useEffect(() => {
+    if (
+      status === "authenticated" &&
+      isSessionExpired() &&
+      activeTab === "open" &&
+      isOpen
+    ) {
+      setSessionError(true);
+      setError("Google 계정 세션이 만료되었습니다. 다시 로그인해주세요.");
+    }
+  }, [status, session, activeTab, isOpen]);
+
+  useEffect(() => {
+    // 세션 오류 상태 확인 및 처리
     if (status === "unauthenticated" && activeTab === "open" && isOpen) {
       setSessionError(true);
-      setError("인증 세션이 만료되었습니다. 다시 로그인해주세요.");
+      // 사용자가 사용하던 파일이 Google Drive 파일이었는지 확인
+      if (localStorage.getItem("currentSchemaFile")) {
+        try {
+          const fileInfo = JSON.parse(
+            localStorage.getItem("currentSchemaFile") || "{}"
+          );
+          if (fileInfo.googleDriveId) {
+            setError(
+              "Google 계정 세션이 만료되었습니다. 다시 로그인하여 파일에 접근하거나 새 파일을 만들어주세요."
+            );
+          } else {
+            setError("인증 세션이 만료되었습니다. 다시 로그인해주세요.");
+          }
+        } catch {
+          setError("인증 세션이 만료되었습니다. 다시 로그인해주세요.");
+        }
+      } else {
+        setError("인증 세션이 만료되었습니다. 다시 로그인해주세요.");
+      }
     }
   }, [status, activeTab, isOpen]);
-
   // 다이얼로그가 열릴 때 초기화
   useEffect(() => {
     if (isOpen) {
@@ -154,7 +191,17 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (isSessionExpired()) {
+          // 닫기 동작을 무시하고 경고 메시지 표시
+          toast.error("계속하려면 로그인하거나 파일을 선택해야 합니다.");
+          return;
+        }
+        !open && onClose();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <CustomDialogHeader
           icon={FilePlusIcon}
