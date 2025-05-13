@@ -56,12 +56,7 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
 
   // 세션 상태 확인 및 처리
   useEffect(() => {
-    if (
-      status === "authenticated" &&
-      isSessionExpired() &&
-      activeTab === "open" &&
-      isOpen
-    ) {
+    if (status === "authenticated" && isSessionExpired() && isOpen) {
       setSessionError(true);
       setError("Google 계정 세션이 만료되었습니다. 다시 로그인해주세요.");
     }
@@ -69,7 +64,7 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
 
   useEffect(() => {
     // 세션 오류 상태 확인 및 처리
-    if (status === "unauthenticated" && activeTab === "open" && isOpen) {
+    if (status === "unauthenticated" && isOpen) {
       setSessionError(true);
       // 사용자가 사용하던 파일이 Google Drive 파일이었는지 확인
       if (localStorage.getItem("currentSchemaFile")) {

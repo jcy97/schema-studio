@@ -93,6 +93,7 @@ function SchemaEditor() {
       currentFile?.googleDriveId &&
       isSessionExpired()
     ) {
+      localStorage.removeItem("currentSchemaFile");
       // 세션 만료 처리
       setIsFileDialogOpen(true);
       toast.error("Google 계정 세션이 만료되었습니다. 다시 로그인해주세요.");
@@ -116,6 +117,28 @@ function SchemaEditor() {
       );
     }
   }, [status, currentFile, isFileDialogOpen]);
+  useEffect(() => {
+    // 구글 드라이브 ID가 있는 파일이 선택되어 있고, 세션이 없는 경우
+    if (currentFile?.googleDriveId && status === "unauthenticated") {
+      // 세션이 끊어졌으므로 파일 다이얼로그 표시
+      setIsFileDialogOpen(true);
+
+      // 구글 드라이브 연결 파일인 경우, 파일 상태 초기화
+      // localStorage에서도 해당 정보 삭제
+      localStorage.removeItem("currentSchemaFile");
+
+      // currentFile 상태 초기화
+      setCurrentFile(null);
+
+      // 자동 저장 비활성화
+      setAutoSaveEnabled(false);
+
+      // 드라이브 관련 작업이 필요한 파일은 세션이 필요함을 알림
+      toast.error(
+        "Google 계정 세션이 만료되었습니다. 다시 로그인하거나 새 파일을 선택해주세요."
+      );
+    }
+  }, [status, currentFile]);
 
   // 컴포넌트 마운트 시 초기 파일 확인
   useEffect(() => {
