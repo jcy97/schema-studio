@@ -76,6 +76,8 @@ function SchemaEditor() {
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  const [fileDataLoaded, setFileDataLoaded] = useState<boolean>(false);
+
   const isSessionExpired = () => {
     if (!session || !session.expiresAt) {
       return true; // 세션 정보가 없으면 만료된 것으로 간주
@@ -122,7 +124,6 @@ function SchemaEditor() {
     if (currentFile?.googleDriveId && status === "unauthenticated") {
       // 세션이 끊어졌으므로 파일 다이얼로그 표시
       setIsFileDialogOpen(true);
-
       // 구글 드라이브 연결 파일인 경우, 파일 상태 초기화
       // localStorage에서도 해당 정보 삭제
       localStorage.removeItem("currentSchemaFile");
@@ -213,6 +214,73 @@ function SchemaEditor() {
     session,
     isFileDirty,
   ]);
+
+  useEffect(() => {
+    // 로그인은 되어 있지만 파일이 선택되지 않은 경우
+    if (status === "authenticated" && !currentFile && !isFileDialogOpen) {
+      console.log(
+        "로그인 상태지만 파일이 선택되지 않았습니다. 다이얼로그를 표시합니다."
+      );
+      setIsFileDialogOpen(true);
+      toast.info("작업할 파일을 선택하거나 새 파일을 생성해주세요.");
+    }
+  }, [status, currentFile, isFileDialogOpen]);
+
+  useEffect(() => {
+    // 로컬스토리지에서 현재 파일 정보 확인
+    const storedFile = localStorage.getItem("currentSchemaFile");
+
+    if (storedFile) {
+      try {
+        const fileInfo = JSON.parse(storedFile);
+        if (nodes && nodes.length > 0) {
+          setFileDataLoaded(true);
+          setIsFileDialogOpen(false);
+          return;
+        }
+        setCurrentFile(fileInfo);
+
+        // 파일 정보가 있다면 실제 파일 데이터 자동 로드
+        if (fileInfo) {
+          console.log("저장된 파일 정보 발견:", fileInfo);
+
+          // Google Drive 파일인 경우
+          if (fileInfo.googleDriveId && session?.accessToken) {
+            console.log(
+              "Google Drive 파일 자동 로드 시도:",
+              fileInfo.googleDriveId
+            );
+
+            // Google Drive에서 파일 로드 시도
+            FileService.loadSchemaFromGoogleDrive(fileInfo.googleDriveId)
+              .then((schemaFile) => {
+                handleOpenFile(schemaFile);
+                setFileDataLoaded(true);
+                setIsFileDialogOpen(false);
+                console.log("Google Drive 파일 자동 로드 성공");
+              })
+              .catch((error) => {
+                console.error("Google Drive 파일 자동 로드 실패:", error);
+                setIsFileDialogOpen(true);
+                toast.error(
+                  "파일을 불러오는데 실패했습니다. 파일을 다시 선택해주세요."
+                );
+              });
+          } else {
+            // 파일이 선택되어 있지만 구글 드라이브 ID가 없거나 로그인이 안 된 경우
+            console.log("파일 정보는 있지만 불러올 수 없는 상태입니다.");
+            setIsFileDialogOpen(true);
+          }
+        }
+      } catch (e) {
+        console.error("저장된 파일 정보 로드 실패:", e);
+        setIsFileDialogOpen(true);
+      }
+    } else {
+      // 현재 관리 중인 파일이 없으면 다이얼로그 표시
+      setIsFileDialogOpen(true);
+    }
+  }, [session, nodes]);
 
   // 자동 저장 토글 함수
   const toggleAutoSave = () => {
