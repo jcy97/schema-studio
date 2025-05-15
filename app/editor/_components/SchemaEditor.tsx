@@ -27,6 +27,7 @@ import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import { CloudIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 const nodeTypes = {
   SchemaNode: NodeComponent,
@@ -79,6 +80,9 @@ function SchemaEditor() {
   const [fileDataLoaded, setFileDataLoaded] = useState<boolean>(false);
 
   const isSessionExpired = () => {
+    if (status === "loading") {
+      return false;
+    }
     if (!session || !session.expiresAt) {
       return true; // 세션 정보가 없으면 만료된 것으로 간주
     }
@@ -88,58 +92,30 @@ function SchemaEditor() {
     return currentTime >= session.expiresAt;
   };
 
+  // 사용자 인증 처리
   useEffect(() => {
-    // 로그인되어 있고 Google Drive 파일을 사용 중인데 세션이 만료된 경우
-    if (
-      status === "authenticated" &&
-      currentFile?.googleDriveId &&
-      isSessionExpired()
-    ) {
-      localStorage.removeItem("currentSchemaFile");
-      // 세션 만료 처리
-      setIsFileDialogOpen(true);
-      toast.error("Google 계정 세션이 만료되었습니다. 다시 로그인해주세요.");
+    // 세션 로딩 중에는 아무 작업도 하지 않음
+    if (status === "loading") {
+      return;
     }
-  }, [status, session, currentFile]);
 
-  // 세션 상태 변화 감지
-  useEffect(() => {
-    // 구글 드라이브 ID가 있는 파일이 선택되어 있고, 세션이 없는 경우
-    if (
-      currentFile?.googleDriveId &&
-      status === "unauthenticated" &&
+    // 구글 드라이브 파일이 있는 경우만 세션 체크
+    if (currentFile?.googleDriveId) {
+      // 세션이 만료된 경우
+      if (status === "unauthenticated" || isSessionExpired()) {
+        // 토스트 메시지만 표시하고, 로컬 스토리지는 아직 지우지 않음
+        toast.error("세션이 만료되었습니다. 다시 로그인이 필요합니다.");
+        setIsFileDialogOpen(true);
+      }
+    } else if (
+      status === "authenticated" &&
+      !currentFile &&
       !isFileDialogOpen
     ) {
-      // 세션이 끊어졌으므로 파일 다이얼로그 표시
       setIsFileDialogOpen(true);
-
-      // 드라이브 관련 작업이 필요한 파일은 세션이 필요함을 알림
-      toast.error(
-        "Google 계정 세션이 만료되었습니다. 다시 로그인하거나 다른 파일을 선택해주세요."
-      );
+      toast.info("작업할 파일을 선택하거나 새 파일을 생성해주세요.");
     }
-  }, [status, currentFile, isFileDialogOpen]);
-  useEffect(() => {
-    // 구글 드라이브 ID가 있는 파일이 선택되어 있고, 세션이 없는 경우
-    if (currentFile?.googleDriveId && status === "unauthenticated") {
-      // 세션이 끊어졌으므로 파일 다이얼로그 표시
-      setIsFileDialogOpen(true);
-      // 구글 드라이브 연결 파일인 경우, 파일 상태 초기화
-      // localStorage에서도 해당 정보 삭제
-      localStorage.removeItem("currentSchemaFile");
-
-      // currentFile 상태 초기화
-      setCurrentFile(null);
-
-      // 자동 저장 비활성화
-      setAutoSaveEnabled(false);
-
-      // 드라이브 관련 작업이 필요한 파일은 세션이 필요함을 알림
-      toast.error(
-        "Google 계정 세션이 만료되었습니다. 다시 로그인하거나 새 파일을 선택해주세요."
-      );
-    }
-  }, [status, currentFile]);
+  }, [status, session, currentFile, isFileDialogOpen]);
 
   // 컴포넌트 마운트 시 초기 파일 확인
   useEffect(() => {
@@ -226,51 +202,61 @@ function SchemaEditor() {
     }
   }, [status, currentFile, isFileDialogOpen]);
 
+  // 세션과 파일 로드 관련 로직
   useEffect(() => {
-    // 로컬스토리지에서 현재 파일 정보 확인
+    // 세션 로딩 중에는 아무것도 하지 않음
+    if (status === "loading") {
+      return;
+    }
+
+    // 이미 노드가 로드된 경우 처리하지 않음
+    if (nodes && nodes.length > 0) {
+      return;
+    }
+
+    // 로컬 스토리지에서 파일 정보 확인
     const storedFile = localStorage.getItem("currentSchemaFile");
 
     if (storedFile) {
       try {
         const fileInfo = JSON.parse(storedFile);
-        if (nodes && nodes.length > 0) {
-          setFileDataLoaded(true);
-          setIsFileDialogOpen(false);
-          return;
-        }
-        setCurrentFile(fileInfo);
 
-        // 파일 정보가 있다면 실제 파일 데이터 자동 로드
-        if (fileInfo) {
-          console.log("저장된 파일 정보 발견:", fileInfo);
+        // 구글 드라이브 파일이고 로그인된 경우에만 자동 로드 시도
+        if (
+          fileInfo.googleDriveId &&
+          status === "authenticated" &&
+          session?.accessToken
+        ) {
+          console.log(
+            "Google Drive 파일 자동 로드 시도:",
+            fileInfo.googleDriveId
+          );
 
-          // Google Drive 파일인 경우
-          if (fileInfo.googleDriveId && session?.accessToken) {
-            console.log(
-              "Google Drive 파일 자동 로드 시도:",
-              fileInfo.googleDriveId
-            );
+          setCurrentFile(fileInfo); // 먼저 파일 정보 설정
 
-            // Google Drive에서 파일 로드 시도
-            FileService.loadSchemaFromGoogleDrive(fileInfo.googleDriveId)
-              .then((schemaFile) => {
-                handleOpenFile(schemaFile);
-                setFileDataLoaded(true);
-                setIsFileDialogOpen(false);
-                console.log("Google Drive 파일 자동 로드 성공");
-              })
-              .catch((error) => {
-                console.error("Google Drive 파일 자동 로드 실패:", error);
-                setIsFileDialogOpen(true);
-                toast.error(
-                  "파일을 불러오는데 실패했습니다. 파일을 다시 선택해주세요."
-                );
-              });
-          } else {
-            // 파일이 선택되어 있지만 구글 드라이브 ID가 없거나 로그인이 안 된 경우
-            console.log("파일 정보는 있지만 불러올 수 없는 상태입니다.");
-            setIsFileDialogOpen(true);
-          }
+          // Google Drive에서 파일 로드 시도
+          FileService.loadSchemaFromGoogleDrive(fileInfo.googleDriveId)
+            .then((schemaFile) => {
+              handleOpenFile(schemaFile);
+              setFileDataLoaded(true);
+              setIsFileDialogOpen(false);
+              console.log("Google Drive 파일 자동 로드 성공");
+            })
+            .catch((error) => {
+              console.error("Google Drive 파일 자동 로드 실패:", error);
+              setIsFileDialogOpen(true);
+              toast.error(
+                "파일을 불러오는데 실패했습니다. 파일을 다시 선택해주세요."
+              );
+            });
+        } else if (fileInfo.googleDriveId && status === "unauthenticated") {
+          // 파일은 구글 드라이브에 있지만 로그인은 안된 경우
+          setIsFileDialogOpen(true);
+          toast.error("Google Drive 파일을 불러오려면 로그인이 필요합니다.");
+        } else {
+          // 구글 드라이브 파일이 아니거나 다른 경우
+          setCurrentFile(fileInfo);
+          setIsFileDialogOpen(!fileInfo); // 파일 정보가 있으면 다이얼로그 닫기
         }
       } catch (e) {
         console.error("저장된 파일 정보 로드 실패:", e);
@@ -280,7 +266,7 @@ function SchemaEditor() {
       // 현재 관리 중인 파일이 없으면 다이얼로그 표시
       setIsFileDialogOpen(true);
     }
-  }, [session, nodes]);
+  }, [status, session]);
 
   // 자동 저장 토글 함수
   const toggleAutoSave = () => {
@@ -430,7 +416,7 @@ function SchemaEditor() {
   // Google Drive 파일 열기 처리
   const handleOpenGoogleDriveFile = async (fileId: string) => {
     if (!session?.accessToken) {
-      alert("Google Drive 파일에 접근하려면 로그인이 필요합니다.");
+      toast.error("Google Drive 파일에 접근하려면 로그인이 필요합니다.");
       return;
     }
 
@@ -447,13 +433,11 @@ function SchemaEditor() {
         googleDriveId: fileId,
       };
 
-      // 스키마 로드 (기존 코드와 동일)
-      await handleOpenFile(schemaFile);
-
-      // 파일 정보 업데이트
       setCurrentFile(fileInfo);
 
-      console.log("Google Drive에서 파일 로드 완료:", schemaFile.metadata.name);
+      // 스키마 로드 (기존 코드와 동일)
+      await handleOpenFile(schemaFile);
+      setIsFileDialogOpen(false);
     } catch (error) {
       console.error("Google Drive 파일 로드 오류:", error);
       alert(
@@ -500,6 +484,11 @@ function SchemaEditor() {
   };
 
   const handleCloseFileDialog = () => {
+    // 로딩 중이면 토스트 없이 다이얼로그 닫기
+    if (isLoading) {
+      setIsFileDialogOpen(false);
+      return;
+    }
     // 현재 파일이 없는 상태에서는 다이얼로그를 닫지 않음
     if (!currentFile) {
       // 사용자에게 파일 선택이 필요하다는 메시지 표시
@@ -527,7 +516,7 @@ function SchemaEditor() {
   };
 
   // 기존 파일 열기 처리
-  const handleOpenFile = (schemaFile: SchemaFile) => {
+  const handleOpenFile = async (schemaFile: SchemaFile) => {
     try {
       console.log("로드할 파일 데이터:", schemaFile); // 디버깅용
 
@@ -603,6 +592,7 @@ function SchemaEditor() {
 
   return (
     <main className="w-full h-full">
+      {(isLoading || status === "loading") && <LoadingOverlay />}
       <ReactFlow
         nodes={nodes}
         edges={edges}

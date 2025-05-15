@@ -144,15 +144,12 @@ const SchemaFileDialog: React.FC<SchemaFileDialogProps> = ({
 
     try {
       await onOpenGoogleDriveFile(fileId);
-      onClose();
     } catch (err) {
       setError(
         `Google Drive 파일 열기 오류: ${
           err instanceof Error ? err.message : String(err)
         }`
       );
-    } finally {
-      setIsOpeningFile(false); // 로딩 상태 비활성화
     }
   };
 
