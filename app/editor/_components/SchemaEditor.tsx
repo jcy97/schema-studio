@@ -5,47 +5,42 @@ import {
   BackgroundVariant,
   Connection,
   Controls,
-  Edge,
   ReactFlow,
   ReactFlowProps,
   useReactFlow,
-  NodeChange,
   NodeRemoveChange,
   ColorMode,
 } from "@xyflow/react";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect } from "react";
 import DeleteableEdge from "./edges/DeletableEdge";
 import NodeComponent from "./nodes/NodeComponent";
 import "@xyflow/react/dist/style.css";
 import { useSchema } from "@/contexts/SchemaContext";
-import { Plus, Save, Play, FilePlus2 } from "lucide-react"; // 아이콘 추가
+import { Plus, Save, FilePlus2, CloudIcon } from "lucide-react";
 import TooltipWrapper from "@/components/TooltipWrapper";
 import GenerateSqlDialog from "./GenerateSqlDialog";
 import SchemaFileDialog from "./SchemaFileDialog";
-import { FileService, SchemaFile } from "@/services/fileService";
+import { SchemaFile } from "@/services/fileService";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
-import { CloudIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import { useSchemaFile } from "@/hooks/useSchemaFile";
+import { isSessionExpired, getSessionMessage } from "@/lib/sessionUtils";
 
-const nodeTypes = {
-  SchemaNode: NodeComponent,
-};
-
-const edgeTypes = {
-  default: DeleteableEdge,
-  deletableEdge: DeleteableEdge,
-};
-
+// 상수 정의
+const nodeTypes = { SchemaNode: NodeComponent };
+const edgeTypes = { default: DeleteableEdge, deletableEdge: DeleteableEdge };
 const snapGrid: [number, number] = [50, 50];
 const fitViewOptions = { padding: 1 };
 
 function SchemaEditor() {
-  // 테마 모드
+  // 테마 관련
   const { theme } = useTheme();
-  // 스키마 컨텍스트에서 필요한 메서드와 상태 가져오기
-  const schema = useSchema();
+  const reactFlowInstance = useReactFlow();
+  const { data: session, status } = useSession();
+
+  // 스키마 컨텍스트
   const {
     nodes,
     edges,
@@ -55,94 +50,110 @@ function SchemaEditor() {
     onNodeSelect,
     addNode,
     addEdge,
-    removeNode,
     addRelationship,
-  } = schema;
+    resetSchemaData,
+  } = useSchema();
 
-  // 파일 관리를 위한 상태
-  const [isFileDialogOpen, setIsFileDialogOpen] = useState<boolean>(false);
-  const [currentFile, setCurrentFile] = useState<{
-    name: string;
-    lastModified: string;
-    googleDriveId?: string;
-  } | null>(null);
-  const [isFileDirty, setIsFileDirty] = useState<boolean>(false);
+  // 파일 열기 처리
+  const handleOpenFile = useCallback(
+    async (schemaFile: SchemaFile) => {
+      try {
+        if (!Array.isArray(schemaFile.nodes)) {
+          throw new Error(
+            "파일 형식 오류: 노드 배열이 없거나 유효하지 않습니다"
+          );
+        }
 
-  const reactFlowInstance = useReactFlow();
-  const { data: session, status } = useSession();
+        // 기존 노드 삭제
+        resetSchemaData();
 
-  const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(
-    null
+        // 노드 및 관계 준비
+        const validNodes = schemaFile.nodes.map((node) => ({
+          ...node,
+          position: node.position || { x: 0, y: 0 },
+          type: node.type || "SchemaNode",
+        }));
+        const validRelationships = schemaFile.relationships || [];
+
+        // 비동기 작업 순차 처리
+        setTimeout(() => {
+          // 노드 추가
+          validNodes.forEach((node) => addNode(node));
+
+          // 관계 추가
+          setTimeout(() => {
+            validRelationships.forEach((rel) => {
+              if (typeof addRelationship === "function") {
+                addRelationship(rel);
+              }
+            });
+
+            // 화면 업데이트
+            setTimeout(() => reactFlowInstance.fitView(), 200);
+          }, 300);
+        }, 100);
+
+        return Promise.resolve();
+      } catch (error) {
+        console.error("스키마 파일 로드 오류:", error);
+        return Promise.reject(error);
+      }
+    },
+    [resetSchemaData, addNode, addRelationship, reactFlowInstance]
   );
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const [fileDataLoaded, setFileDataLoaded] = useState<boolean>(false);
+  // 파일 관리 훅 사용
+  const {
+    currentFile,
+    isFileDirty,
+    isFileDialogOpen,
+    isLoading,
+    autoSaveEnabled,
+    createFile,
+    saveFile,
+    openGoogleDriveFile,
+    openFileDialog,
+    closeFileDialog,
+    toggleAutoSave,
+  } = useSchemaFile({
+    nodes,
+    relationships,
+    resetSchemaData,
+    onOpenFile: handleOpenFile,
+    session,
+  });
 
-  const isSessionExpired = () => {
-    if (status === "loading") {
-      return false;
-    }
-    if (!session || !session.expiresAt) {
-      return true; // 세션 정보가 없으면 만료된 것으로 간주
-    }
-
-    // 현재 시간과 만료 시간 비교 (expiresAt은 UNIX 타임스탬프)
-    const currentTime = Math.floor(Date.now() / 1000);
-    return currentTime >= session.expiresAt;
-  };
-
-  // 사용자 인증 처리
+  // 세션 만료 체크 및 자동 로드
   useEffect(() => {
-    // 세션 로딩 중에는 아무 작업도 하지 않음
-    if (status === "loading") {
-      return;
-    }
+    if (status === "loading" || (nodes && nodes.length > 0)) return;
 
-    // 구글 드라이브 파일이 있는 경우만 세션 체크
     if (currentFile?.googleDriveId) {
-      // 세션이 만료된 경우
-      if (status === "unauthenticated" || isSessionExpired()) {
-        // 토스트 메시지만 표시하고, 로컬 스토리지는 아직 지우지 않음
-        toast.error("세션이 만료되었습니다. 다시 로그인이 필요합니다.");
-        setIsFileDialogOpen(true);
+      const sessionExpired = isSessionExpired(session);
+      const sessionMessage = getSessionMessage(status, sessionExpired);
+
+      if (sessionMessage) {
+        toast.error(sessionMessage);
+        openFileDialog();
+      } else if (status === "authenticated" && session?.accessToken) {
+        openGoogleDriveFile(currentFile.googleDriveId);
       }
     } else if (
       status === "authenticated" &&
       !currentFile &&
       !isFileDialogOpen
     ) {
-      setIsFileDialogOpen(true);
+      openFileDialog();
       toast.info("작업할 파일을 선택하거나 새 파일을 생성해주세요.");
     }
-  }, [status, session, currentFile, isFileDialogOpen]);
-
-  // 컴포넌트 마운트 시 초기 파일 확인
-  useEffect(() => {
-    // 로컬스토리지에서 현재 파일 정보 확인
-    const storedFile = localStorage.getItem("currentSchemaFile");
-
-    if (storedFile) {
-      try {
-        const fileInfo = JSON.parse(storedFile);
-        setCurrentFile(fileInfo);
-      } catch (e) {
-        console.error("저장된 파일 정보 로드 실패:", e);
-        // 파일 정보가 손상된 경우 파일 다이얼로그 표시
-        setIsFileDialogOpen(true);
-      }
-    } else {
-      // 현재 관리 중인 파일이 없으면 다이얼로그 표시
-      setIsFileDialogOpen(true);
-    }
-  }, []);
-
-  // 노드, 엣지, 관계 변경 시 파일 상태 갱신
-  useEffect(() => {
-    if (currentFile) {
-      setIsFileDirty(true);
-    }
-  }, [nodes, edges, relationships]);
+  }, [
+    status,
+    session,
+    currentFile,
+    isFileDialogOpen,
+    nodes,
+    openFileDialog,
+    openGoogleDriveFile,
+  ]);
 
   // 창 닫기 전 저장 확인
   useEffect(() => {
@@ -156,433 +167,42 @@ function SchemaEditor() {
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isFileDirty]);
 
-  // 자동 저장 타이머 설정
-  useEffect(() => {
-    if (autoSaveEnabled && currentFile && session?.accessToken && isFileDirty) {
-      // 이전 타이머 취소
-      if (autoSaveTimer) {
-        clearTimeout(autoSaveTimer);
+  // 노드 선택 처리
+  const onNodeSelectionChange = useCallback(
+    (data: ReactFlowProps<AppNode, any>) => {
+      if (!data.nodes) return;
+      const selectedNode = data.nodes.find((node) => node.selected === true);
+      if (selectedNode) {
+        onNodeSelect(selectedNode.id);
       }
+    },
+    [onNodeSelect]
+  );
 
-      // 10초 후에 자동 저장 (원하는 시간으로 조정 가능)
-      const timer = setTimeout(() => {
-        handleAutoSave();
-      }, 10000);
-
-      setAutoSaveTimer(timer);
-
-      return () => {
-        if (timer) clearTimeout(timer);
-      };
-    }
-  }, [
-    nodes,
-    edges,
-    relationships,
-    autoSaveEnabled,
-    currentFile,
-    session,
-    isFileDirty,
-  ]);
-
-  useEffect(() => {
-    // 로그인은 되어 있지만 파일이 선택되지 않은 경우
-    if (status === "authenticated" && !currentFile && !isFileDialogOpen) {
-      console.log(
-        "로그인 상태지만 파일이 선택되지 않았습니다. 다이얼로그를 표시합니다."
-      );
-      setIsFileDialogOpen(true);
-      toast.info("작업할 파일을 선택하거나 새 파일을 생성해주세요.");
-    }
-  }, [status, currentFile, isFileDialogOpen]);
-
-  // 세션과 파일 로드 관련 로직
-  useEffect(() => {
-    // 세션 로딩 중에는 아무것도 하지 않음
-    if (status === "loading") {
-      return;
-    }
-
-    // 이미 노드가 로드된 경우 처리하지 않음
-    if (nodes && nodes.length > 0) {
-      return;
-    }
-
-    // 로컬 스토리지에서 파일 정보 확인
-    const storedFile = localStorage.getItem("currentSchemaFile");
-
-    if (storedFile) {
-      try {
-        const fileInfo = JSON.parse(storedFile);
-
-        // 구글 드라이브 파일이고 로그인된 경우에만 자동 로드 시도
-        if (
-          fileInfo.googleDriveId &&
-          status === "authenticated" &&
-          session?.accessToken
-        ) {
-          console.log(
-            "Google Drive 파일 자동 로드 시도:",
-            fileInfo.googleDriveId
-          );
-
-          setCurrentFile(fileInfo); // 먼저 파일 정보 설정
-
-          // Google Drive에서 파일 로드 시도
-          FileService.loadSchemaFromGoogleDrive(fileInfo.googleDriveId)
-            .then((schemaFile) => {
-              handleOpenFile(schemaFile);
-              setFileDataLoaded(true);
-              setIsFileDialogOpen(false);
-              console.log("Google Drive 파일 자동 로드 성공");
-            })
-            .catch((error) => {
-              console.error("Google Drive 파일 자동 로드 실패:", error);
-              setIsFileDialogOpen(true);
-              toast.error(
-                "파일을 불러오는데 실패했습니다. 파일을 다시 선택해주세요."
-              );
-            });
-        } else if (fileInfo.googleDriveId && status === "unauthenticated") {
-          // 파일은 구글 드라이브에 있지만 로그인은 안된 경우
-          setIsFileDialogOpen(true);
-          toast.error("Google Drive 파일을 불러오려면 로그인이 필요합니다.");
-        } else {
-          // 구글 드라이브 파일이 아니거나 다른 경우
-          setCurrentFile(fileInfo);
-          setIsFileDialogOpen(!fileInfo); // 파일 정보가 있으면 다이얼로그 닫기
-        }
-      } catch (e) {
-        console.error("저장된 파일 정보 로드 실패:", e);
-        setIsFileDialogOpen(true);
-      }
-    } else {
-      // 현재 관리 중인 파일이 없으면 다이얼로그 표시
-      setIsFileDialogOpen(true);
-    }
-  }, [status, session]);
-
-  // 자동 저장 토글 함수
-  const toggleAutoSave = () => {
-    if (!session) {
-      alert("자동 저장을 사용하려면 Google 계정으로 로그인해야 합니다.");
-      return;
-    }
-
-    setAutoSaveEnabled(!autoSaveEnabled);
-  };
-
-  // 자동 저장 함수
-  const handleAutoSave = async () => {
-    if (!currentFile || !session || !isFileDirty) return;
-
-    try {
-      await FileService.saveSchemaToGoogleDrive(
-        currentFile.name,
-        nodes,
-        relationships,
-        {
-          name: currentFile.name,
-          lastModified: new Date().toISOString(),
-        },
-        currentFile.googleDriveId
-      );
-
-      // 파일 상태 업데이트
-      setCurrentFile({
-        ...currentFile,
-        lastModified: new Date().toISOString(),
-      });
-
-      setIsFileDirty(false);
-      console.log("자동 저장 완료:", currentFile.name);
-    } catch (error) {
-      console.error("자동 저장 오류:", error);
-    }
-  };
-
-  const onNodeSelectionChange = (data: ReactFlowProps<AppNode, Edge>) => {
-    if (!data.nodes) return;
-    const selectedNode = data.nodes.find((node) => node.selected === true);
-    if (!selectedNode) return;
-    onNodeSelect(selectedNode.id);
-  };
-
-  const handleAddNode = () => {
+  // 노드 추가
+  const handleAddNode = useCallback(() => {
     const newNodeId = addNode();
     setTimeout(() => {
       const addedNode = reactFlowInstance.getNode(newNodeId);
-      if (!addedNode) return;
-
-      reactFlowInstance.setCenter(
-        addedNode.position.x + 150,
-        addedNode.position.y + 150,
-        { zoom: 1, duration: 500 }
-      );
+      if (addedNode) {
+        reactFlowInstance.setCenter(
+          addedNode.position.x + 150,
+          addedNode.position.y + 150,
+          { zoom: 1, duration: 500 }
+        );
+      }
     }, 100);
-  };
+  }, [addNode, reactFlowInstance]);
 
-  // 스키마 데이터 초기화 (새 파일 생성 시 사용)
-  const resetSchemaData = () => {
-    try {
-      // 1. 각 노드를 제거하는 변경사항 생성
-      if (nodes && nodes.length > 0) {
-        const removeChanges: NodeRemoveChange[] = nodes.map((node) => ({
-          type: "remove",
-          id: node.id,
-        }));
+  // 저장 처리
+  const handleSave = useCallback(() => {
+    saveFile();
+  }, [saveFile]);
 
-        // 변경사항 적용
-        onNodesChange(removeChanges);
-      }
-
-      console.log("스키마 데이터 초기화 완료");
-    } catch (error) {
-      console.error("스키마 데이터 초기화 오류:", error);
-    }
-  };
-
-  // Google Drive 파일 저장 처리
-  const handleSave = async () => {
-    if (!currentFile) {
-      // 현재 관리 중인 파일이 없으면 새 파일 다이얼로그 표시
-      setIsFileDialogOpen(true);
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      if (session) {
-        // Google Drive에 저장
-        const fileId = await FileService.saveSchemaToGoogleDrive(
-          currentFile.name,
-          nodes,
-          relationships,
-          {
-            name: currentFile.name,
-            lastModified: new Date().toISOString(),
-          },
-          currentFile.googleDriveId
-        );
-
-        // 파일 상태 업데이트
-        setCurrentFile({
-          ...currentFile,
-          lastModified: new Date().toISOString(),
-          googleDriveId: fileId,
-        });
-
-        setIsFileDirty(false);
-        toast.success(`파일이 저장되었습니다.`);
-      } else {
-        // 로그인되지 않은 경우 로컬 저장으로 폴백
-        FileService.saveSchemaToFile(currentFile.name, nodes, relationships, {
-          name: currentFile.name,
-          lastModified: new Date().toISOString(),
-        });
-
-        // 파일 상태 업데이트
-        setCurrentFile({
-          ...currentFile,
-          lastModified: new Date().toISOString(),
-        });
-
-        setIsFileDirty(false);
-
-        // 사용자에게 저장 안내 메시지 표시
-        alert(
-          `${currentFile.name}.scst 파일이 다운로드 되었습니다.\n다운로드 폴더를 확인해주세요.`
-        );
-      }
-    } catch (error) {
-      console.error("파일 저장 오류:", error);
-      alert(
-        `파일 저장 중 오류가 발생했습니다: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Google Drive 파일 열기 처리
-  const handleOpenGoogleDriveFile = async (fileId: string) => {
-    if (!session?.accessToken) {
-      toast.error("Google Drive 파일에 접근하려면 로그인이 필요합니다.");
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      // Google Drive에서 파일 로드
-      const schemaFile = await FileService.loadSchemaFromGoogleDrive(fileId);
-
-      // 파일 정보 업데이트
-      const fileInfo = {
-        name: schemaFile.metadata.name,
-        lastModified: new Date().toISOString(),
-        googleDriveId: fileId,
-      };
-
-      setCurrentFile(fileInfo);
-
-      // 스키마 로드 (기존 코드와 동일)
-      await handleOpenFile(schemaFile);
-      setIsFileDialogOpen(false);
-    } catch (error) {
-      console.error("Google Drive 파일 로드 오류:", error);
-      alert(
-        `Google Drive 파일 로드 중 오류가 발생했습니다: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 새 파일 생성 다이얼로그 표시
-  const handleNewFile = () => {
-    setIsFileDialogOpen(true);
-  };
-
-  // 새 파일 생성 처리
-  const handleCreateFile = (fileName: string, description: string) => {
-    // 기존 스키마 데이터 초기화
-    resetSchemaData();
-
-    // 빈 스키마 데이터로 새 파일 생성
-    FileService.saveSchemaToFile(
-      fileName,
-      [], // 빈 노드 배열
-      [], // 빈 관계 배열
-      {
-        name: fileName,
-        description: description,
-        createdAt: new Date().toISOString(),
-      }
-    );
-
-    // 현재 파일 정보 업데이트
-    setCurrentFile({
-      name: fileName,
-      lastModified: new Date().toISOString(),
-    });
-
-    setIsFileDirty(false);
-
-    console.log("새 스키마 파일 생성:", fileName);
-  };
-
-  const handleCloseFileDialog = () => {
-    // 로딩 중이면 토스트 없이 다이얼로그 닫기
-    if (isLoading) {
-      setIsFileDialogOpen(false);
-      return;
-    }
-    // 현재 파일이 없는 상태에서는 다이얼로그를 닫지 않음
-    if (!currentFile) {
-      // 사용자에게 파일 선택이 필요하다는 메시지 표시
-      toast.error("작업을 시작하려면 파일을 생성하거나 선택해야 합니다.");
-      return;
-    }
-
-    setIsFileDialogOpen(false);
-  };
-
-  // 관계 추가 함수
-  const addRelationships = (relationshipsToAdd: Relationship[]) => {
-    if (!relationshipsToAdd || relationshipsToAdd.length === 0) return;
-
-    // 각 관계를 개별적으로 추가
-    relationshipsToAdd.forEach((rel) => {
-      try {
-        if (typeof addRelationship === "function") {
-          addRelationship(rel);
-        }
-      } catch (err) {
-        console.error("관계 추가 오류:", err);
-      }
-    });
-  };
-
-  // 기존 파일 열기 처리
-  const handleOpenFile = async (schemaFile: SchemaFile) => {
-    try {
-      console.log("로드할 파일 데이터:", schemaFile); // 디버깅용
-
-      // 유효성 검사
-      if (!Array.isArray(schemaFile.nodes)) {
-        throw new Error("파일 형식 오류: 노드 배열이 없거나 유효하지 않습니다");
-      }
-
-      // 1. 기존 노드 모두 삭제
-      resetSchemaData();
-
-      // 2. 새 노드 추가
-      // 위치 정보 및 타입 확인하고 기본값 추가
-      const validNodes = schemaFile.nodes.map((node) => ({
-        ...node,
-        position: node.position || { x: 0, y: 0 },
-        type: node.type || "SchemaNode",
-      }));
-
-      // 관계 정보 저장 (노드 추가 후 적용할 예정)
-      const validRelationships = schemaFile.relationships || [];
-
-      // 각 노드를 개별적으로 추가
-      setTimeout(() => {
-        if (validNodes && validNodes.length > 0) {
-          // 각 노드에 대해 수동으로 addNode 호출
-          validNodes.forEach((node) => {
-            addNode(node);
-          });
-
-          console.log("노드 추가 완료:", validNodes.length);
-
-          // 노드 추가 후 관계 추가
-          setTimeout(() => {
-            if (validRelationships.length > 0) {
-              addRelationships(validRelationships);
-              console.log("관계 추가 완료:", validRelationships.length);
-            }
-
-            // 화면 업데이트
-            setTimeout(() => {
-              reactFlowInstance.fitView();
-            }, 200);
-          }, 300);
-        }
-      }, 100);
-
-      // 현재 파일 정보 업데이트
-      setCurrentFile({
-        name: schemaFile.metadata.name,
-        lastModified: new Date().toISOString(),
-      });
-
-      setIsFileDirty(false);
-
-      console.log("스키마 파일 로드 완료:", schemaFile.metadata.name);
-    } catch (error) {
-      console.error("스키마 파일 로드 오류:", error);
-      alert(
-        `스키마 파일 로드 중 오류가 발생했습니다: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    }
-  };
-
+  // 엣지 연결
   const onConnect = useCallback(
     (connection: Connection) => {
       addEdge(connection);
@@ -624,8 +244,8 @@ function SchemaEditor() {
           <TooltipWrapper content="새 파일을 생성합니다">
             <div
               className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
-              cursor-pointer shadow-md"
-              onClick={handleNewFile}
+                cursor-pointer shadow-md"
+              onClick={openFileDialog}
             >
               <FilePlus2 size={20} />
             </div>
@@ -635,13 +255,14 @@ function SchemaEditor() {
           <TooltipWrapper content="현재 작업을 저장합니다">
             <div
               className={`w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
-              cursor-pointer shadow-md ${isFileDirty ? "animate-pulse" : ""}`}
+                cursor-pointer shadow-md ${isFileDirty ? "animate-pulse" : ""}`}
               onClick={handleSave}
             >
               <Save size={20} />
             </div>
           </TooltipWrapper>
-          {/* UI에 자동 저장 토글 버튼 추가 */}
+
+          {/* 자동 저장 버튼 */}
           <TooltipWrapper
             content={autoSaveEnabled ? "자동 저장 끄기" : "자동 저장 켜기"}
           >
@@ -649,12 +270,14 @@ function SchemaEditor() {
               className={`w-10 h-10 ${
                 autoSaveEnabled ? "bg-green-500" : "bg-gray-400"
               } hover:opacity-80 text-white rounded-full flex items-center justify-center
-    cursor-pointer shadow-md`}
+                cursor-pointer shadow-md`}
               onClick={toggleAutoSave}
             >
               <CloudIcon size={20} />
             </div>
           </TooltipWrapper>
+
+          {/* SQL 생성 버튼 */}
           <TooltipWrapper content="SQL을 생성합니다">
             <div>
               <GenerateSqlDialog />
@@ -665,7 +288,7 @@ function SchemaEditor() {
           <TooltipWrapper content="새 스키마를 추가합니다">
             <div
               className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
-              cursor-pointer shadow-md"
+                cursor-pointer shadow-md"
               onClick={handleAddNode}
             >
               <Plus size={20} />
@@ -677,10 +300,10 @@ function SchemaEditor() {
       {/* 파일 다이얼로그 */}
       <SchemaFileDialog
         isOpen={isFileDialogOpen || !currentFile}
-        onClose={handleCloseFileDialog}
-        onCreateFile={handleCreateFile}
+        onClose={closeFileDialog}
+        onCreateFile={createFile}
         onOpenFile={handleOpenFile}
-        onOpenGoogleDriveFile={handleOpenGoogleDriveFile}
+        onOpenGoogleDriveFile={openGoogleDriveFile}
       />
     </main>
   );

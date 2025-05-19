@@ -21,6 +21,7 @@ import {
   EdgeChange,
   OnNodesChange,
   OnEdgesChange,
+  NodeRemoveChange,
 } from "@xyflow/react";
 import {
   createContext,
@@ -73,6 +74,8 @@ interface SchemaContextType {
     selectedNodeIds: string[],
     options: SQLGenerationOptions
   ) => string;
+
+  resetSchemaData: () => void;
 }
 
 const SchemaContext = createContext<SchemaContextType | undefined>(undefined);
@@ -379,7 +382,20 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const addRelationship = (customRelationship?: Relationship) => {
-    const newRelationshipId = customRelationship?.id || `rel-${Date.now()}`;
+    let newRelationshipId =
+      customRelationship?.id ||
+      `rel-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    if (customRelationship?.id) {
+      const idExists = relationships.some(
+        (rel) => rel.id === customRelationship.id
+      );
+      if (idExists) {
+        newRelationshipId = `rel-${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 9)}`;
+      }
+    }
 
     if (customRelationship) {
       setRelationships((rels) => [
@@ -647,6 +663,29 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     },
     [nodes, relationships]
   );
+
+  const resetSchemaData = () => {
+    try {
+      // 1. 노드 제거
+      if (nodes && nodes.length > 0) {
+        const removeChanges: NodeRemoveChange[] = nodes.map((node) => ({
+          type: "remove",
+          id: node.id,
+        }));
+        onNodesChange(removeChanges);
+      }
+
+      // 2. 관계 초기화
+      setRelationships([]);
+
+      // 3. 엣지 초기화
+      setEdges([]);
+
+      console.log("스키마 데이터 초기화 완료");
+    } catch (error) {
+      console.error("스키마 데이터 초기화 오류:", error);
+    }
+  };
   const value: SchemaContextType = {
     nodes,
     edges,
@@ -675,6 +714,7 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     getSelectedRelationship,
     updateColumnOrders,
     generateSqlDDLForSelectedNodes,
+    resetSchemaData,
   };
 
   return (
