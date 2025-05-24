@@ -8,7 +8,7 @@ export interface SchemaFileMetadata {
   description?: string;
   createdAt: string;
   lastModified: string;
-  version: string;
+  version?: string;
   googleDriveId?: string;
 }
 

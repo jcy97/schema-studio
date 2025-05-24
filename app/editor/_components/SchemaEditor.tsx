@@ -5,18 +5,25 @@ import {
   BackgroundVariant,
   Connection,
   Controls,
-  ReactFlow,
   ReactFlowProps,
   useReactFlow,
   NodeRemoveChange,
   ColorMode,
+  ReactFlow,
 } from "@xyflow/react";
 import React, { useCallback, useEffect } from "react";
 import DeleteableEdge from "./edges/DeletableEdge";
 import NodeComponent from "./nodes/NodeComponent";
 import "@xyflow/react/dist/style.css";
 import { useSchema } from "@/contexts/SchemaContext";
-import { Plus, Save, FilePlus2, CloudIcon } from "lucide-react";
+import {
+  Plus,
+  Save,
+  FolderOpen,
+  Cloud,
+  Download,
+  UploadCloud,
+} from "lucide-react";
 import TooltipWrapper from "@/components/TooltipWrapper";
 import GenerateSqlDialog from "./GenerateSqlDialog";
 import SchemaFileDialog from "./SchemaFileDialog";
@@ -26,7 +33,15 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { useSchemaFile } from "@/hooks/useSchemaFile";
-import { isSessionExpired, getSessionMessage } from "@/lib/sessionUtils";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 // 상수 정의
 const nodeTypes = { SchemaNode: NodeComponent };
@@ -111,7 +126,11 @@ function SchemaEditor() {
     autoSaveEnabled,
     createFile,
     saveFile,
+    syncToGoogleDrive,
+    openLocalFile,
     openGoogleDriveFile,
+    deleteFile,
+    exportFile,
     openFileDialog,
     closeFileDialog,
     toggleAutoSave,
@@ -123,37 +142,12 @@ function SchemaEditor() {
     session,
   });
 
-  // 세션 만료 체크 및 자동 로드
+  // 초기 로드: 파일이 없으면 다이얼로그 표시
   useEffect(() => {
-    if (status === "loading" || (nodes && nodes.length > 0)) return;
-
-    if (currentFile?.googleDriveId) {
-      const sessionExpired = isSessionExpired(session);
-      const sessionMessage = getSessionMessage(status, sessionExpired);
-
-      if (sessionMessage) {
-        toast.error(sessionMessage);
-        openFileDialog();
-      } else if (status === "authenticated" && session?.accessToken) {
-        openGoogleDriveFile(currentFile.googleDriveId);
-      }
-    } else if (
-      status === "authenticated" &&
-      !currentFile &&
-      !isFileDialogOpen
-    ) {
+    if (!currentFile && !isFileDialogOpen && nodes.length === 0) {
       openFileDialog();
-      toast.info("작업할 파일을 선택하거나 새 파일을 생성해주세요.");
     }
-  }, [
-    status,
-    session,
-    currentFile,
-    isFileDialogOpen,
-    nodes,
-    openFileDialog,
-    openGoogleDriveFile,
-  ]);
+  }, [currentFile, isFileDialogOpen, nodes.length, openFileDialog]);
 
   // 창 닫기 전 저장 확인
   useEffect(() => {
@@ -197,11 +191,6 @@ function SchemaEditor() {
     }, 100);
   }, [addNode, reactFlowInstance]);
 
-  // 저장 처리
-  const handleSave = useCallback(() => {
-    saveFile();
-  }, [saveFile]);
-
   // 엣지 연결
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -233,77 +222,100 @@ function SchemaEditor() {
 
         {/* 파일 상태 표시 */}
         {currentFile && (
-          <div className="absolute top-4 left-28 bg-white/80 px-3 py-1 border rounded-md shadow-sm text-sm dark:bg-background dark:text-white">
-            {currentFile.name}.scst {isFileDirty && "*"}
+          <div className="absolute top-4 left-28 bg-white/80 dark:bg-background/80 px-3 py-1.5 rounded-md shadow-sm flex items-center gap-2 text-sm">
+            <span className="font-medium">{currentFile.name}.scst</span>
+            {isFileDirty && <span className="text-red-500">*</span>}
+            {currentFile.googleDriveId && (
+              <Badge variant="secondary" className="text-xs">
+                <Cloud size={12} className="mr-1" />
+                동기화
+              </Badge>
+            )}
           </div>
         )}
 
         {/* 액션 버튼 그룹 */}
-        <div className="absolute top-4 right-4 flex space-x-3 z-10">
-          {/* 새 파일 생성 버튼 */}
-          <TooltipWrapper content="새 파일을 생성합니다">
-            <div
-              className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
-                cursor-pointer shadow-md"
-              onClick={openFileDialog}
-            >
-              <FilePlus2 size={20} />
-            </div>
-          </TooltipWrapper>
+        <div className="absolute top-4 right-4 flex items-center space-x-3 z-10">
+          {/* 파일 메뉴 드롭다운 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="rounded-full shadow-md"
+              >
+                <FolderOpen size={20} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={openFileDialog}>
+                <FolderOpen size={16} className="mr-2" />
+                파일 열기/생성
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={saveFile} disabled={!isFileDirty}>
+                <Save size={16} className="mr-2" />
+                저장 {isFileDirty && "*"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={exportFile}>
+                <Download size={16} className="mr-2" />
+                파일 내보내기
+              </DropdownMenuItem>
+              {currentFile && !currentFile.googleDriveId && session && (
+                <DropdownMenuItem onClick={syncToGoogleDrive}>
+                  <UploadCloud size={16} className="mr-2" />
+                  구글 드라이브에 동기화
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          {/* 저장 버튼 */}
-          <TooltipWrapper content="현재 작업을 저장합니다">
-            <div
-              className={`w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
-                cursor-pointer shadow-md ${isFileDirty ? "animate-pulse" : ""}`}
-              onClick={handleSave}
-            >
-              <Save size={20} />
-            </div>
-          </TooltipWrapper>
-
-          {/* 자동 저장 버튼 */}
+          {/* 자동 저장 토글 */}
           <TooltipWrapper
-            content={autoSaveEnabled ? "자동 저장 끄기" : "자동 저장 켜기"}
+            content={autoSaveEnabled ? "자동 저장 켜짐" : "자동 저장 꺼짐"}
           >
-            <div
-              className={`w-10 h-10 ${
-                autoSaveEnabled ? "bg-green-500" : "bg-gray-400"
-              } hover:opacity-80 text-white rounded-full flex items-center justify-center
-                cursor-pointer shadow-md`}
+            <Button
+              variant={autoSaveEnabled ? "default" : "secondary"}
+              size="icon"
+              className="rounded-full shadow-md"
               onClick={toggleAutoSave}
             >
-              <CloudIcon size={20} />
-            </div>
+              <Cloud
+                size={20}
+                className={autoSaveEnabled ? "animate-pulse" : ""}
+              />
+            </Button>
           </TooltipWrapper>
 
           {/* SQL 생성 버튼 */}
-          <TooltipWrapper content="SQL을 생성합니다">
+          <TooltipWrapper content="SQL 생성">
             <div>
               <GenerateSqlDialog />
             </div>
           </TooltipWrapper>
 
           {/* 새 스키마 추가 버튼 */}
-          <TooltipWrapper content="새 스키마를 추가합니다">
-            <div
-              className="w-10 h-10 bg-primary hover:bg-primary/80 text-white rounded-full flex items-center justify-center
-                cursor-pointer shadow-md"
+          <TooltipWrapper content="새 테이블 추가">
+            <Button
+              variant="default"
+              size="icon"
+              className="rounded-full shadow-md"
               onClick={handleAddNode}
             >
               <Plus size={20} />
-            </div>
+            </Button>
           </TooltipWrapper>
         </div>
       </ReactFlow>
 
       {/* 파일 다이얼로그 */}
       <SchemaFileDialog
-        isOpen={isFileDialogOpen || !currentFile}
+        isOpen={isFileDialogOpen}
         onClose={closeFileDialog}
         onCreateFile={createFile}
-        onOpenFile={handleOpenFile}
+        onOpenLocalFile={openLocalFile}
         onOpenGoogleDriveFile={openGoogleDriveFile}
+        onDeleteFile={deleteFile}
       />
     </main>
   );
