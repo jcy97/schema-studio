@@ -45,7 +45,6 @@ interface SchemaContextType {
   cloneNode: (nodeId: string) => void;
   removeColumn: (nodeId: string, columnId: string) => void;
 
-  // 관계 관련 메서드
   updateRelationship: (
     relationshipId: string,
     data: Partial<Relationship>
@@ -63,13 +62,11 @@ interface SchemaContextType {
   onColumnSelect: (columnId: string) => void;
   getSelectedColumn: () => Column | null;
 
-  // 관계 선택 관련 메서드
   onRelationshipSelect: (relationshipId: string) => void;
   getSelectedRelationship: () => Relationship | null;
 
   updateColumnOrders: (nodeId: string, updateColumns: Column[]) => void;
 
-  // SQL 생성 관련 메서드
   generateSqlDDLForSelectedNodes: (
     selectedNodeIds: string[],
     options: SQLGenerationOptions
@@ -90,10 +87,8 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     string | null
   >(null);
 
-  // 초기화 여부를 추적하는 ref
   const initializedRef = useRef(false);
 
-  // 최초 로딩 시에만 한 번 0번 컬럼 선택
   useEffect(() => {
     if (initializedRef.current) return;
 
@@ -113,45 +108,32 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // 관계 변경시 엣지 동기화
   useEffect(() => {
     synchronizeEdgesWithRelationships();
   }, [relationships]);
 
   const synchronizeEdgesWithRelationships = useCallback(() => {
-    // 핸들 정보 유지를 위한 객체
-    const existingEdgeHandles: Record<string, EdgeHandleInfo> = {};
-
-    edges.forEach((edge) => {
-      existingEdgeHandles[edge.id] = {
-        sourceHandle: edge.sourceHandle || null,
-        targetHandle: edge.targetHandle || null,
-      };
-    });
-
     const relationshipEdges = relationships.map((rel) => ({
       id: rel.id,
       source: rel.sourceTableId,
       target: rel.targetTableId,
-      sourceHandle: existingEdgeHandles[rel.id]?.sourceHandle || null,
-      targetHandle: existingEdgeHandles[rel.id]?.targetHandle || null,
+      sourceHandle: rel.sourceHandle || null,
+      targetHandle: rel.targetHandle || null,
       type: "deletableEdge",
       data: { relationship: rel },
     }));
 
     setEdges(relationshipEdges);
-  }, [relationships, edges, setEdges]);
+  }, [relationships, setEdges]);
 
   const updateNode = (nodeId: string, data: Partial<AppNode["data"]>) => {
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === nodeId) {
-          // Create new node object to change reference
           const newNode = {
             ...node,
             data: { ...node.data, ...data },
           };
-          console.log("Node update:", nodeId, newNode.data);
           return newNode;
         }
         return node;
@@ -219,7 +201,6 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const removeNode = (nodeId: string) => {
-    // 노드 삭제 시 관련된 관계도 모두 삭제
     setRelationships((rels) =>
       rels.filter(
         (rel) =>
@@ -317,20 +298,16 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const removeColumn = (nodeId: string, columnId: string) => {
-    // 해당 컬럼을 참조하는 관계도 함께 삭제
     setRelationships((rels) =>
       rels.filter((rel) => {
-        // 소스나 타겟 컬럼에 포함되어 있는지 확인
         const isSourceColumn = rel.sourceColumnIds.includes(columnId);
         const isTargetColumn = rel.targetColumnIds.includes(columnId);
 
-        // 중간 테이블의 컬럼인지 확인
         const isJunctionSourceColumn =
           rel.junctionTable?.sourceColumnIds.includes(columnId);
         const isJunctionTargetColumn =
           rel.junctionTable?.targetColumnIds.includes(columnId);
 
-        // 어느 쪽에도 포함되지 않은 관계만 유지
         return (
           !isSourceColumn &&
           !isTargetColumn &&
@@ -366,7 +343,6 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
     );
   };
 
-  // 관계 관련 메서드 추가
   const updateRelationship = (
     relationshipId: string,
     data: Partial<Relationship>
@@ -403,7 +379,6 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
         { ...customRelationship, id: newRelationshipId },
       ]);
     } else {
-      // 기본 관계 생성 (선택된 노드가 있을 경우 소스로 설정)
       const sourceNodeId =
         selectedNodeId || (nodes.length > 0 ? nodes[0].id : "");
 
@@ -412,7 +387,6 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
         return newRelationshipId;
       }
 
-      // 기본 타겟 노드 (소스 노드가 아닌 첫 번째 노드)
       const targetNodeId =
         nodes.find((node) => node.id !== sourceNodeId)?.id || "";
 
@@ -421,13 +395,11 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
         return newRelationshipId;
       }
 
-      // 소스 노드의 PK 컬럼 찾기
       const sourceNode = nodes.find((node) => node.id === sourceNodeId);
       const sourceColumn =
         sourceNode?.data.columns.find((col) => col.constraints.isPrimaryKey) ||
         sourceNode?.data.columns[0];
 
-      // 타겟 노드의 FK 컬럼 (또는 첫 번째 컬럼)
       const targetNode = nodes.find((node) => node.id === targetNodeId);
       const targetColumn =
         targetNode?.data.columns.find((col) => col.constraints.foreignKey) ||
@@ -441,12 +413,12 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
       const newRelationship: Relationship = {
         id: newRelationshipId,
         name: `${sourceNode?.data.logicalName}-${targetNode?.data.logicalName}`,
-        type: RelationshipType.ONE_TO_MANY, // 기본값
+        type: RelationshipType.ONE_TO_MANY,
         sourceTableId: sourceNodeId,
         sourceColumnIds: [sourceColumn.id],
         targetTableId: targetNodeId,
         targetColumnIds: [targetColumn.id],
-        onDelete: "CASCADE", // 기본값
+        onDelete: "CASCADE",
         description: `${sourceNode?.data.logicalName}과(와) ${targetNode?.data.logicalName} 간의 관계`,
       };
 
@@ -460,7 +432,6 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
   const removeRelationship = (relationshipId: string) => {
     setRelationships((rels) => rels.filter((rel) => rel.id !== relationshipId));
 
-    // 선택된 관계가 삭제된 경우, 다른 관계 선택
     if (selectedRelationshipId === relationshipId) {
       const remainingRelationships = relationships.filter(
         (rel) => rel.id !== relationshipId
@@ -478,7 +449,6 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const addEdge = (connection: Connection) => {
-    // 엣지 추가 시 관계도 함께 생성
     const sourceNode = nodes.find((node) => node.id === connection.source);
     const targetNode = nodes.find((node) => node.id === connection.target);
 
@@ -487,23 +457,25 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    // 소스 노드의 PK 컬럼 (또는 첫 번째 컬럼)
-    const sourceColumn =
+    console.log(
+      `관계 생성: ${sourceNode.data.logicalName}(부모) → ${targetNode.data.logicalName}(자식)`
+    );
+
+    // sourceNode가 부모(1), targetNode가 자식(N)
+    const parentColumn =
       sourceNode.data.columns.find((col) => col.constraints.isPrimaryKey) ||
       sourceNode.data.columns[0];
 
-    // 타겟 노드에 FK 컬럼 추가 또는 기존 FK 컬럼 사용
-    let targetColumnId = "";
-    let isNewColumn = false;
+    let childColumnId = "";
 
     const existingFkColumn = targetNode.data.columns.find(
       (col) => col.constraints.foreignKey?.tableId === sourceNode.id
     );
 
     if (existingFkColumn) {
-      targetColumnId = existingFkColumn.id;
+      childColumnId = existingFkColumn.id;
     } else {
-      // 새 FK 컬럼 추가
+      // 자식 테이블(target)에 FK 컬럼 추가
       const newColumnId = `col-${Date.now()}-${Math.random()
         .toString(36)
         .substring(2, 9)}`;
@@ -515,13 +487,13 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
         id: newColumnId,
         logicalName: `${sourceNode.data.logicalName} ID`,
         physicalName: fkColumnName,
-        dataType: sourceColumn.dataType,
+        dataType: parentColumn.dataType,
         order: targetNode.data.columns.length,
         constraints: {
           isNotNull: true,
           foreignKey: {
             tableId: sourceNode.id,
-            columnId: sourceColumn.id,
+            columnId: parentColumn.id,
           },
         },
       };
@@ -530,45 +502,30 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
         columns: [...targetNode.data.columns, newFkColumn],
       });
 
-      targetColumnId = newColumnId;
-      isNewColumn = true;
+      childColumnId = newColumnId;
     }
 
-    // 관계 생성
     const relationshipId = `rel-${Date.now()}`;
     const newRelationship: Relationship = {
       id: relationshipId,
       name: `${sourceNode.data.logicalName}-${targetNode.data.logicalName}`,
-      type: RelationshipType.ONE_TO_MANY,
-      sourceTableId: sourceNode.id,
-      sourceColumnIds: [sourceColumn.id],
-      targetTableId: targetNode.id,
-      targetColumnIds: [targetColumnId],
+      type: RelationshipType.ONE_TO_MANY, // source(부모):target(자식) = 1:N
+      sourceTableId: sourceNode.id, // 부모 테이블
+      sourceColumnIds: [parentColumn.id], // 부모 테이블의 PK
+      targetTableId: targetNode.id, // 자식 테이블
+      targetColumnIds: [childColumnId], // 자식 테이블의 FK
+      sourceHandle: connection.sourceHandle || undefined,
+      targetHandle: connection.targetHandle || undefined,
       onDelete: "CASCADE",
-      description: `${sourceNode.data.logicalName}과(와) ${targetNode.data.logicalName} 간의 관계`,
+      description: `${sourceNode.data.logicalName}(부모)과 ${targetNode.data.logicalName}(자식) 간의 1:N 관계`,
     };
 
     setRelationships((rels) => [...rels, newRelationship]);
-
-    // 엣지 생성 (관계가 자동으로 엣지로 변환됨)
-    const newEdge: Edge = {
-      id: relationshipId,
-      source: connection.source,
-      target: connection.target,
-      sourceHandle: connection.sourceHandle,
-      targetHandle: connection.targetHandle,
-      type: "deletableEdge",
-      data: { relationship: newRelationship },
-    };
-    setEdges((eds) => [...eds, newEdge]);
   };
 
   const removeEdge = (edgeId: string) => {
-    // 관련 관계도 함께 삭제
-    // 기본 엣지 ID와 관계 ID가 같은 경우
     const directRelationship = relationships.find((rel) => rel.id === edgeId);
 
-    // N:M 관계의 경우 엣지 ID가 rel-id-source 또는 rel-id-target 형태
     const manyToManyBaseId = edgeId.replace(/-source$|-target$/, "");
     const manyToManyRelationship = relationships.find(
       (rel) => rel.id === manyToManyBaseId
@@ -586,11 +543,9 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
   const onNodeSelect = (nodeId: string) => {
     setSelectedNodeId(nodeId);
 
-    // 이미 선택된 컬럼이 없는 경우에만 첫 번째 컬럼을 자동 선택
     const selectedNode = nodes.find((node) => node.id === nodeId);
     const currentSelectedColumn = getSelectedColumn();
 
-    // 현재 선택된 컬럼이 없거나, 선택된 컬럼이 다른 노드에 속해 있는 경우에만 첫 번째 컬럼 선택
     if (!currentSelectedColumn || getSelectedNode()?.id !== nodeId) {
       if (
         selectedNode &&
@@ -609,7 +564,6 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const onColumnSelect = (columnId: string) => {
-    console.log("Column selected:", columnId); // 디버깅용 로그 추가
     setSelectedColumnId(columnId);
   };
 
@@ -666,7 +620,6 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
 
   const resetSchemaData = () => {
     try {
-      // 1. 노드 제거
       if (nodes && nodes.length > 0) {
         const removeChanges: NodeRemoveChange[] = nodes.map((node) => ({
           type: "remove",
@@ -675,17 +628,13 @@ export const SchemaProvider = ({ children }: { children: React.ReactNode }) => {
         onNodesChange(removeChanges);
       }
 
-      // 2. 관계 초기화
       setRelationships([]);
-
-      // 3. 엣지 초기화
       setEdges([]);
-
-      console.log("스키마 데이터 초기화 완료");
     } catch (error) {
       console.error("스키마 데이터 초기화 오류:", error);
     }
   };
+
   const value: SchemaContextType = {
     nodes,
     edges,
